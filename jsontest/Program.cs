@@ -14,11 +14,14 @@ namespace jsontest
     {
         static void Main(string[] args)
         {
+            // Find strings like:
+            // O Sultantree, hallowd spirit of my line, forgive my weakness. My failings have cost us dear...
+            // 
+
             var map = new List<long>
                 {
                     //0x01EC0F40
-                    0x020AFC20,
-                    0x8L,
+                    0x02594140,
                     0x20L,
                     0x100L,
                     0x0L
