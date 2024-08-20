@@ -1,0 +1,1 @@
+aws s3api put-object --body latest/address.json --key latest/address.json --endpoint-url https://36b6c4744ccceb0acf36d8951bb741ab.r2.cloudflarestorage.com --bucket ffxiv-hermes
