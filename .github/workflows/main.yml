@@ -1,0 +1,22 @@
+name: Push to R2
+on: 
+  push:
+    branches: [ "main" ]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+      - name: Deploy to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          AWS_DEFAULT_OUTPUT: ${{ secrets.AWS_DEFAULT_OUTPUT }}
+        run: |
+          aws s3api put-object \
+           --body latest/address.json \
+           --key latest/address.json \
+           --endpoint-url https://36b6c4744ccceb0acf36d8951bb741ab.r2.cloudflarestorage.com \
+           --bucket ffxiv-hermes
