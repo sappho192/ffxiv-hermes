@@ -21,7 +21,7 @@ namespace jsontest
             var map = new List<long>
                 {
                     //0x01EC0F40
-                    0x02725070,
+                    0x027AC170,
                     0x20L,
                     0x120L,
                     0x0L
