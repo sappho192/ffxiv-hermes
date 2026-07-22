@@ -143,8 +143,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          dotnet build tools/Hermes.V2.Generator/Hermes.V2.Generator.csproj -c Release
           revision="$(tr -d '\r\n' < publish-v2/revision.txt)"
-          calculated="$(dotnet run --project tools/Hermes.V2.Generator -c Release -- validate --manifest publish-v2/manifest.json --schema schemas/hermes-v2.schema.json)"
+          calculated="$(dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- validate --manifest publish-v2/manifest.json --schema schemas/hermes-v2.schema.json)"
           test "$revision" = "$calculated"
           test "$(jq -r '.validation.status' publish-v2/manifest.json)" = "live-verified"
           printf '%s\n' "$revision" > publish-v2/revision.txt
@@ -201,7 +202,7 @@ jobs:
           curl --fail --silent --show-error --max-time 15 "$base/latest.json" -o publish-v2/public-latest.json
           test "$(jq -r '.resourceRevision' publish-v2/public-latest.json)" = "$revision"
           curl --fail --silent --show-error --max-time 15 "$base/manifests/$revision.json" -o publish-v2/public-manifest.json
-          test "$(dotnet run --project tools/Hermes.V2.Generator -c Release -- revision --manifest publish-v2/public-manifest.json)" = "$revision"
+          test "$(dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- revision --manifest publish-v2/public-manifest.json)" = "$revision"
 
       - name: Record production state in git
         shell: bash

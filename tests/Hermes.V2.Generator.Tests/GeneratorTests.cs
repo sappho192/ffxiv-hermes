@@ -87,7 +87,7 @@ public sealed class GeneratorTests {
 
     private static string FindRepositoryRoot() {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);
-        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "V2_IMPLEMENTATION_PLAN.md"))) {
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "Hermes.V2.slnx"))) {
             directory = directory.Parent;
         }
 
