@@ -38,14 +38,14 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: hermes-v2-production
+    environment: main
     permissions:
       contents: write
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
-      AWS_DEFAULT_OUTPUT: json
+      AWS_DEFAULT_OUTPUT: ${{ secrets.AWS_DEFAULT_OUTPUT }}
       R2_ENDPOINT: https://36b6c4744ccceb0acf36d8951bb741ab.r2.cloudflarestorage.com
       R2_BUCKET: ffxiv-hermes
       V2_PUBLIC_BASE_URL: https://hermes.sapphosound.com/v2
@@ -62,9 +62,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin "$GITHUB_REF_NAME"
-          test "$GITHUB_SHA" = "$(git rev-parse "origin/$GITHUB_REF_NAME")" || {
-            echo "The selected workflow revision is not the current $GITHUB_REF_NAME head." >&2
+          test "$GITHUB_REF_NAME" = main || {
+            echo "Publish Hermes v2 must be dispatched from main." >&2
+            exit 1
+          }
+          git fetch origin main
+          test "$GITHUB_SHA" = "$(git rev-parse origin/main)" || {
+            echo "The selected workflow revision is not the current main head." >&2
             exit 1
           }
 
@@ -113,7 +117,7 @@ jobs:
             --fcs-directory "$GITHUB_WORKSPACE/external/FFXIVClientStructs" \
             --fcs-commit "$FCS_COMMIT" \
             --generator-commit "$GITHUB_SHA" \
-            --minimum-sharlayan-version 8.1.0 \
+            --minimum-sharlayan-version 9.1.2 \
             --validation-status live-verified \
             --game-version "$GAME_VERSION" \
             --executable-sha256 "$EXECUTABLE_SHA256" \
@@ -190,7 +194,7 @@ jobs:
             --key v2/latest.json \
             --body publish-v2/latest.json \
             --content-type application/json \
-            --cache-control "public,max-age=60,must-revalidate" \
+            --cache-control "public,max-age=0,s-maxage=60,must-revalidate" \
             --endpoint-url "$R2_ENDPOINT" >/dev/null
 
       - name: Verify public endpoint
@@ -199,8 +203,17 @@ jobs:
           set -euo pipefail
           revision="$(cat publish-v2/revision.txt)"
           base="${V2_PUBLIC_BASE_URL%/}"
-          curl --fail --silent --show-error --max-time 15 "$base/latest.json" -o publish-v2/public-latest.json
-          test "$(jq -r '.resourceRevision' publish-v2/public-latest.json)" = "$revision"
+          for attempt in {1..13}; do
+            curl --fail --silent --show-error --max-time 15 "$base/latest.json" -o publish-v2/public-latest.json
+            if [[ "$(jq -r '.resourceRevision' publish-v2/public-latest.json)" == "$revision" ]]; then
+              break
+            fi
+            if [[ "$attempt" == 13 ]]; then
+              echo "Public latest did not converge to $revision within 120 seconds." >&2
+              exit 1
+            fi
+            sleep 10
+          done
           curl --fail --silent --show-error --max-time 15 "$base/manifests/$revision.json" -o publish-v2/public-manifest.json
           test "$(dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- revision --manifest publish-v2/public-manifest.json)" = "$revision"
 

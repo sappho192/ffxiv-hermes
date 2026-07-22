@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "compatibility": {
-    "minimumSharlayanVersion": "8.1.0",
+    "minimumSharlayanVersion": "9.1.2",
     "pointerResolverVersion": 1
   },
   "source": {

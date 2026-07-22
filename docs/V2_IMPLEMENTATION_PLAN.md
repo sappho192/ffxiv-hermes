@@ -320,9 +320,10 @@ concurrency:
 5. generator를 두 번 실행하고 byte-identical 결과를 확인한다.
 6. JSON Schema, generator test 및 Sharlayan contract test를 실행한다.
 7. production manifest와 비교하여 리소스 변경 여부를 판단한다.
-8. 리소스가 바뀌지 않았으면 처리한 FCS SHA 상태만 갱신한다.
-9. 리소스가 바뀌면 candidate manifest와 diff를 포함한 PR을 만든다.
-10. 자동 생성 PR에는 R2 credential을 제공하지 않는다.
+8. production이 아직 없으면 fixture와 동일해도 최초 candidate PR을 만든다.
+9. production이 있고 리소스가 바뀌지 않았으면 처리한 FCS SHA 상태만 갱신한다.
+10. 리소스가 바뀌면 candidate manifest와 diff를 포함한 PR을 만든다.
+11. 자동 생성 PR에는 R2 credential을 제공하지 않는다.
 
 FCS HEAD가 workflow 실행 중 다시 바뀌더라도 현재 실행은 처음 확인한 SHA만 처리한다. 다음 예약 실행이 새 HEAD를 처리한다.
 
@@ -604,10 +605,12 @@ Sharlayan.Lite의 구현 상태 및 향후 연동 계약만
 - [x] 변경 시 candidate PR 생성
 - [x] 변경 없음 상태 처리 구현
 - [x] Action dependency commit pin 적용
+- [x] repository secret `HERMES_CANDIDATE_TOKEN` 설정
 
 완료 조건:
 
 - 새 FCS HEAD를 한 번만 처리한다.
+- 최초 production 전에는 bootstrap fixture와 동일해도 candidate PR을 만든다.
 - 관련 메타데이터가 달라질 때만 manifest 변경 PR이 생긴다.
 - candidate workflow에는 production secret이 없다.
 
@@ -617,10 +620,13 @@ Sharlayan.Lite의 구현 상태 및 향후 연동 계약만
 - [x] CHATLOG 및 Talk 실제 게임 검증 절차 구현
 - [x] `publish-v2.yml` 추가
 - [x] GitHub repository R2 secret 설정
-- [ ] protected environment와 승인자 설정
+- [x] 기존 `main` protected environment 사용 결정
+- [x] `main` required reviewer와 deployment branch policy 설정
+- [ ] Sharlayan.Lite 9.1.2 배포 및 embedded manifest 동기화
 - [x] immutable upload, checksum read-back 및 latest-last 적용
 - [x] rollback dispatch 구현
 - [x] R2 cache-control 및 content-type 설정
+- [x] Cloudflare `/v2/` Cache Rule 설정
 
 완료 조건:
 
@@ -630,7 +636,7 @@ Sharlayan.Lite의 구현 상태 및 향후 연동 계약만
 
 ### Phase 6: Legacy 정리와 리소스 확장
 
-- [ ] legacy endpoint 사용 종료 조건 결정
+- [x] legacy endpoint를 무기한 유지하기로 결정
 - [ ] `latest/address.json` 수동 갱신 중단
 - [ ] Talk 활성 상태 판별 가능성 조사
 - [ ] `TalkSubtitle` 리소스 검토
@@ -681,13 +687,17 @@ v2 전환은 다음 조건을 모두 만족할 때 완료된 것으로 본다.
 
 ## 19. 후속 결정 사항
 
-구현 시작 전에 다음 운영 값을 확정한다.
+다음 운영 값으로 확정한다. GitHub 및 Cloudflare의 구체적인 설정 절차는
+`docs/V2_GITHUB_AND_CACHE_SETUP.md`를 따른다.
 
 - [확정] v2 public base URL: `https://hermes.sapphosound.com/v2/`
-- `minimumSharlayanVersion`의 최초 버전
-- live smoke를 수동으로 유지할지 self-hosted runner를 사용할지 여부
-- candidate PR 생성에 사용할 bot 또는 `GITHUB_TOKEN` 정책
-- production 승인자와 protected environment 이름
-- immutable manifest 및 latest pointer의 cache-control 값
-- legacy endpoint 지원 종료 조건
-- manifest 서명 도입 시점
+- [확정] 최초 `minimumSharlayanVersion`: `9.1.2`
+- [확정] live smoke: 수동 유지. 게임 2FA와 GPU instance가 필요하므로 self-hosted
+  automation은 도입하지 않는다.
+- [확정] candidate PR: repository secret `HERMES_CANDIDATE_TOKEN`에 저장한
+  fine-grained PAT 사용
+- [확정] production 승인자: `sappho192`, protected environment: `main`
+- [확정] immutable cache-control: `public,max-age=31536000,immutable`
+- [확정] latest cache-control: `public,max-age=0,s-maxage=60,must-revalidate`
+- [확정] legacy endpoint: 무기한 유지
+- [미정] manifest 서명 도입 시점. 운영 이슈 또는 위협 모델 변경 시 재검토한다.

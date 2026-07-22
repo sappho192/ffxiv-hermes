@@ -71,7 +71,7 @@ public sealed class GeneratorTests {
     private static HermesManifest CreateManifest() {
         return new HermesManifest(
             2,
-            new Compatibility("8.1.0", 1),
+            new Compatibility("9.1.2", 1),
             new Source(
                 "https://github.com/aers/FFXIVClientStructs.git",
                 new string('a', 40),

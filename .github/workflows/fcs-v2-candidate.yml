@@ -35,7 +35,9 @@ jobs:
           commit="$(git ls-remote https://github.com/aers/FFXIVClientStructs.git refs/heads/main | cut -f1)"
           [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid FCS commit: $commit" >&2; exit 1; }
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
-          if jq -e --arg commit "$commit" '.fcsCommit == $commit' v2/source/fcs-head.json >/dev/null; then
+          candidate="v2/candidates/$commit.json"
+          if jq -e --arg commit "$commit" '.fcsCommit == $commit' v2/source/fcs-head.json >/dev/null \
+            && { [[ -f v2/latest.json ]] || [[ -f "$candidate" ]]; }; then
             echo "already_processed=true" >> "$GITHUB_OUTPUT"
           else
             echo "already_processed=false" >> "$GITHUB_OUTPUT"
@@ -80,7 +82,7 @@ jobs:
             --fcs-directory "$GITHUB_WORKSPACE/external/FFXIVClientStructs"
             --fcs-commit "${{ steps.fcs.outputs.commit }}"
             --generator-commit "$GITHUB_SHA"
-            --minimum-sharlayan-version 8.1.0
+            --minimum-sharlayan-version 9.1.2
             --validation-status candidate
             --schema "$GITHUB_WORKSPACE/schemas/hermes-v2.schema.json"
             --diff-against "$previous"
@@ -103,7 +105,11 @@ jobs:
           fi
           jq -S '{roots,resources}' "$previous" > previous-resources.json
           jq -S '{roots,resources}' candidate-one.json > candidate-resources.json
-          if cmp --silent previous-resources.json candidate-resources.json; then
+          if [[ ! -f v2/latest.json ]]; then
+            # The first production promotion always needs a reviewable candidate,
+            # even when its runtime resources match the bootstrap fixture.
+            changed=true
+          elif cmp --silent previous-resources.json candidate-resources.json; then
             changed=false
           else
             changed=true
@@ -130,13 +136,13 @@ jobs:
     if: needs.generate.outputs.already_processed == 'false' && needs.generate.result == 'success'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     steps:
       - name: Checkout Hermes
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.HERMES_CANDIDATE_TOKEN }}
 
       - name: Download candidate artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -147,7 +153,7 @@ jobs:
       - name: Record unchanged FCS head
         if: needs.generate.outputs.changed == 'false'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.HERMES_CANDIDATE_TOKEN }}
           FCS_COMMIT: ${{ needs.generate.outputs.fcs_commit }}
         shell: bash
         run: |
@@ -163,7 +169,7 @@ jobs:
       - name: Create candidate pull request
         if: needs.generate.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.HERMES_CANDIDATE_TOKEN }}
           FCS_COMMIT: ${{ needs.generate.outputs.fcs_commit }}
         shell: bash
         run: |
