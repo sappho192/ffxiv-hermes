@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sappho192/ffxiv-hermes/raw/main/schemas/hermes-v2.schema.json",
+  "title": "Hermes v2 runtime manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "compatibility",
+    "source",
+    "platform",
+    "roots",
+    "resources",
+    "validation"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimumSharlayanVersion", "pointerResolverVersion"],
+      "properties": {
+        "minimumSharlayanVersion": { "$ref": "#/$defs/semver" },
+        "pointerResolverVersion": { "const": 1 }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fcsRepository", "fcsCommit", "generatorRepository", "generatorCommit"],
+      "properties": {
+        "fcsRepository": { "const": "https://github.com/aers/FFXIVClientStructs.git" },
+        "fcsCommit": { "$ref": "#/$defs/gitSha" },
+        "generatorRepository": { "const": "https://github.com/sappho192/ffxiv-hermes.git" },
+        "generatorCommit": { "$ref": "#/$defs/gitSha" }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["process", "architecture"],
+      "properties": {
+        "process": { "const": "ffxiv_dx11.exe" },
+        "architecture": { "const": "x64" }
+      }
+    },
+    "roots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["framework"],
+      "properties": {
+        "framework": { "$ref": "#/$defs/root" }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["chatLog", "talk"],
+      "properties": {
+        "chatLog": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["root", "uiModuleOffset", "raptureLogModuleOffset", "indexVectorOffset", "dataVectorOffset"],
+          "properties": {
+            "root": { "const": "framework" },
+            "uiModuleOffset": { "$ref": "#/$defs/offset" },
+            "raptureLogModuleOffset": { "$ref": "#/$defs/offset" },
+            "indexVectorOffset": { "$ref": "#/$defs/offset" },
+            "dataVectorOffset": { "$ref": "#/$defs/offset" }
+          }
+        },
+        "talk": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["root", "semantics", "uiModuleOffset", "nameOffset", "textOffset", "utf8String"],
+          "properties": {
+            "root": { "const": "framework" },
+            "semantics": { "const": "lastStandardTalk" },
+            "uiModuleOffset": { "$ref": "#/$defs/offset" },
+            "nameOffset": { "$ref": "#/$defs/offset" },
+            "textOffset": { "$ref": "#/$defs/offset" },
+            "utf8String": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["stringPointerOffset", "bufferUsedOffset", "stringLengthOffset"],
+              "properties": {
+                "stringPointerOffset": { "$ref": "#/$defs/offset" },
+                "bufferUsedOffset": { "$ref": "#/$defs/offset" },
+                "stringLengthOffset": { "$ref": "#/$defs/offset" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "validation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": { "status": { "const": "candidate" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "gameVersion", "executableSha256", "verifierCommit"],
+          "properties": {
+            "status": { "const": "live-verified" },
+            "gameVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "executableSha256": { "$ref": "#/$defs/sha256" },
+            "verifierCommit": { "$ref": "#/$defs/gitSha" }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "semver": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$" },
+    "offset": { "type": "integer", "minimum": 0, "maximum": 16777216 },
+    "pattern": { "type": "string", "minLength": 2, "maxLength": 1024, "pattern": "^(?:[0-9A-F]{2}|\\?\\?)+$" },
+    "root": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pattern", "relativeFollowOffset", "isPointer"],
+      "properties": {
+        "pattern": { "$ref": "#/$defs/pattern" },
+        "relativeFollowOffset": { "type": "integer", "minimum": 0, "maximum": 512 },
+        "isPointer": { "const": true }
+      }
+    }
+  }
+}

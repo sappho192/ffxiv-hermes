@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/tools/">
+    <Project Path="tools/Hermes.V2.Generator/Hermes.V2.Generator.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Hermes.V2.Generator.TestFcs/Hermes.V2.Generator.TestFcs.csproj" />
+    <Project Path="tests/Hermes.V2.Generator.Tests/Hermes.V2.Generator.Tests.csproj" />
+  </Folder>
+</Solution>

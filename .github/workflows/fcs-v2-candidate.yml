@@ -1,0 +1,191 @@
+name: Hermes v2 FCS candidate
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: fcs-v2-candidate
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+      fcs_commit: ${{ steps.fcs.outputs.commit }}
+      already_processed: ${{ steps.fcs.outputs.already_processed }}
+    steps:
+      - name: Checkout Hermes
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Resolve FCS main once
+        id: fcs
+        shell: bash
+        run: |
+          set -euo pipefail
+          commit="$(git ls-remote https://github.com/aers/FFXIVClientStructs.git refs/heads/main | cut -f1)"
+          [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid FCS commit: $commit" >&2; exit 1; }
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          if jq -e --arg commit "$commit" '.fcsCommit == $commit' v2/source/fcs-head.json >/dev/null; then
+            echo "already_processed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_processed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stop when already processed
+        if: steps.fcs.outputs.already_processed == 'true'
+        run: echo "FCS ${{ steps.fcs.outputs.commit }} was already processed."
+
+      - name: Checkout exact FCS commit
+        if: steps.fcs.outputs.already_processed != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p external/FFXIVClientStructs
+          git -C external/FFXIVClientStructs init
+          git -C external/FFXIVClientStructs remote add origin https://github.com/aers/FFXIVClientStructs.git
+          git -C external/FFXIVClientStructs fetch --depth 1 origin "${{ steps.fcs.outputs.commit }}"
+          git -C external/FFXIVClientStructs checkout --detach FETCH_HEAD
+          test "$(git -C external/FFXIVClientStructs rev-parse HEAD)" = "${{ steps.fcs.outputs.commit }}"
+
+      - name: Build FCS and generator tests
+        if: steps.fcs.outputs.already_processed != 'true'
+        run: |
+          dotnet build external/FFXIVClientStructs/FFXIVClientStructs/FFXIVClientStructs.csproj -c Release
+          dotnet test tests/Hermes.V2.Generator.Tests/Hermes.V2.Generator.Tests.csproj -c Release
+
+      - name: Generate twice
+        if: steps.fcs.outputs.already_processed != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous=v2/fixtures/manifest.valid.json
+          if [[ -f v2/latest.json ]]; then
+            production_revision="$(jq -r '.resourceRevision' v2/latest.json)"
+            production_path="v2/manifests/${production_revision#sha256:}.json"
+            [[ -f "$production_path" ]] && previous="$production_path"
+          fi
+          common=(
+            generate
+            --repository-root "$GITHUB_WORKSPACE"
+            --fcs-directory "$GITHUB_WORKSPACE/external/FFXIVClientStructs"
+            --fcs-commit "${{ steps.fcs.outputs.commit }}"
+            --generator-commit "$GITHUB_SHA"
+            --minimum-sharlayan-version 8.1.0
+            --validation-status candidate
+            --schema "$GITHUB_WORKSPACE/schemas/hermes-v2.schema.json"
+            --diff-against "$previous"
+          )
+          dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- "${common[@]}" --output candidate-one.json --summary candidate-summary.md
+          dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- "${common[@]}" --output candidate-two.json
+          cmp --silent candidate-one.json candidate-two.json
+
+      - name: Compare runtime resources
+        if: steps.fcs.outputs.already_processed != 'true'
+        id: compare
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous=v2/fixtures/manifest.valid.json
+          if [[ -f v2/latest.json ]]; then
+            production_revision="$(jq -r '.resourceRevision' v2/latest.json)"
+            production_path="v2/manifests/${production_revision#sha256:}.json"
+            [[ -f "$production_path" ]] && previous="$production_path"
+          fi
+          jq -S '{roots,resources}' "$previous" > previous-resources.json
+          jq -S '{roots,resources}' candidate-one.json > candidate-resources.json
+          if cmp --silent previous-resources.json candidate-resources.json; then
+            changed=false
+          else
+            changed=true
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "${{ steps.fcs.outputs.commit }}" > fcs-commit.txt
+          printf '%s\n' "$changed" > resource-changed.txt
+
+      - name: Upload candidate artifact
+        if: steps.fcs.outputs.already_processed != 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hermes-v2-candidate
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            candidate-one.json
+            candidate-summary.md
+            fcs-commit.txt
+            resource-changed.txt
+
+  record:
+    needs: generate
+    if: needs.generate.outputs.already_processed == 'false' && needs.generate.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout Hermes
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Download candidate artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: hermes-v2-candidate
+          path: candidate-artifact
+
+      - name: Record unchanged FCS head
+        if: needs.generate.outputs.changed == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FCS_COMMIT: ${{ needs.generate.outputs.fcs_commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/contents/v2/source/fcs-head.json" --jq .sha)"
+          content="$(jq -n --arg commit "$FCS_COMMIT" '{fcsCommit:$commit}' | base64 -w 0)"
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/v2/source/fcs-head.json" \
+            -f message="Record unchanged FCS head $FCS_COMMIT" \
+            -f content="$content" \
+            -f sha="$current_sha" \
+            -f branch="${GITHUB_REF_NAME}"
+
+      - name: Create candidate pull request
+        if: needs.generate.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FCS_COMMIT: ${{ needs.generate.outputs.fcs_commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="hermes-v2/fcs-${FCS_COMMIT:0:12}"
+          existing_pr="$(gh pr list --head "$branch" --state open --json url --jq '.[0].url // empty')"
+          if [[ -n "$existing_pr" ]]; then
+            echo "Candidate pull request already exists: $existing_pr"
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git checkout -b "$branch"
+          mkdir -p v2/candidates
+          cp candidate-artifact/candidate-one.json "v2/candidates/$FCS_COMMIT.json"
+          cp candidate-artifact/candidate-summary.md "v2/candidates/$FCS_COMMIT.md"
+          jq -n --arg commit "$FCS_COMMIT" '{fcsCommit:$commit}' > v2/source/fcs-head.json
+          git add v2/candidates v2/source/fcs-head.json
+          git commit -m "Add Hermes v2 candidate for FCS ${FCS_COMMIT:0:12}"
+          git push origin "$branch"
+          gh pr create \
+            --base "$GITHUB_REF_NAME" \
+            --head "$branch" \
+            --title "Hermes v2 candidate: FCS ${FCS_COMMIT:0:12}" \
+            --body-file "v2/candidates/$FCS_COMMIT.md"
