@@ -1,16 +1,19 @@
 name: Push to R2
 permissions:
   contents: read
-on: 
+on:
   push:
     branches: [ "main" ]
+    paths:
+      - "latest/address.json"
+      - ".github/workflows/main.yml"
 jobs:
   build:
     environment: main
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@master
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Deploy to R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -18,4 +21,9 @@ jobs:
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
           AWS_DEFAULT_OUTPUT: ${{ secrets.AWS_DEFAULT_OUTPUT }}
         run: |
-          aws s3api put-object --body latest/address.json --key latest/address.json --endpoint-url https://36b6c4744ccceb0acf36d8951bb741ab.r2.cloudflarestorage.com --bucket ffxiv-hermes
+          aws s3api put-object \
+            --body latest/address.json \
+            --key latest/address.json \
+            --content-type application/json \
+            --endpoint-url https://36b6c4744ccceb0acf36d8951bb741ab.r2.cloudflarestorage.com \
+            --bucket ffxiv-hermes
