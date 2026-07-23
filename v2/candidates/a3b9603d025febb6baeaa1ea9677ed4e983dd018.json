@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 2,
+  "compatibility": {
+    "minimumSharlayanVersion": "9.1.2",
+    "pointerResolverVersion": 1
+  },
+  "source": {
+    "fcsRepository": "https://github.com/aers/FFXIVClientStructs.git",
+    "fcsCommit": "a3b9603d025febb6baeaa1ea9677ed4e983dd018",
+    "generatorRepository": "https://github.com/sappho192/ffxiv-hermes.git",
+    "generatorCommit": "c2412206a404c8975b586cf1c092db3ef57619cd"
+  },
+  "platform": {
+    "process": "ffxiv_dx11.exe",
+    "architecture": "x64"
+  },
+  "roots": {
+    "framework": {
+      "pattern": "488B1D????????8B7C24",
+      "relativeFollowOffset": 3,
+      "isPointer": true
+    }
+  },
+  "resources": {
+    "chatLog": {
+      "root": "framework",
+      "uiModuleOffset": 11112,
+      "raptureLogModuleOffset": 6848,
+      "indexVectorOffset": 72,
+      "dataVectorOffset": 96
+    },
+    "talk": {
+      "root": "framework",
+      "semantics": "lastStandardTalk",
+      "uiModuleOffset": 11112,
+      "nameOffset": 1044224,
+      "textOffset": 1044328,
+      "utf8String": {
+        "stringPointerOffset": 0,
+        "bufferUsedOffset": 16,
+        "stringLengthOffset": 24
+      }
+    }
+  },
+  "validation": {
+    "status": "candidate"
+  }
+}
