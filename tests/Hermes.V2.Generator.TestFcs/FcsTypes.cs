@@ -7,6 +7,13 @@ namespace InteropGenerator.Runtime.Attributes {
         public ushort[] RelativeFollowOffsets { get; } = [relativeFollowOffset];
         public bool IsPointer { get; } = isPointer;
     }
+
+    [AttributeUsage(AttributeTargets.Field, AllowMultiple = true)]
+    public sealed class BitFieldAttribute<T>(string name, int index, int length = 1) : Attribute {
+        public string Name { get; } = name;
+        public int Index { get; } = index;
+        public int Length { get; } = length;
+    }
 }
 
 namespace FFXIVClientStructs.FFXIV.Client.System.Framework {
@@ -22,11 +29,24 @@ namespace FFXIVClientStructs.FFXIV.Client.System.Framework {
 }
 
 namespace FFXIVClientStructs.FFXIV.Client.UI {
+    using FFXIVClientStructs.FFXIV.Component.GUI;
+
     [StructLayout(LayoutKind.Explicit)]
     public struct UIModule {
         [FieldOffset(0x1AC0)] internal nint RaptureLogModule;
+        [FieldOffset(0xD2670)] internal RaptureAtkModule RaptureAtkModule;
         [FieldOffset(0xFEF00)] public nint LastTalkName;
         [FieldOffset(0xFEF68)] public nint LastTalkText;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct RaptureAtkModule {
+        [FieldOffset(0x13420)] public RaptureAtkUnitManager RaptureAtkUnitManager;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct RaptureAtkUnitManager {
+        [FieldOffset(0)] public AtkUnitManager AtkUnitManager;
     }
 }
 
@@ -43,6 +63,64 @@ namespace FFXIVClientStructs.FFXIV.Client.System.String {
     public struct Utf8String {
         [FieldOffset(0x00)] public nint StringPtr;
         [FieldOffset(0x10)] public long BufUsed;
-        [FieldOffset(0x18)] public long StringLength;
+    }
+}
+
+namespace FFXIVClientStructs.FFXIV.Component.GUI {
+    using InteropGenerator.Runtime.Attributes;
+
+    public enum AtkUnitBaseVisibilityState : byte {
+        None = 0,
+        IsVisible = 1 << 1,
+    }
+
+    public enum AtkValueType {
+        Undefined = 0,
+        String = 0x8,
+        Managed = 0x20,
+        ManagedString = Managed | String,
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 0x800)]
+    internal struct FixedSizeArray256Pointers {
+        [FieldOffset(0)] public nint First;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 0x20)]
+    internal struct FixedSizeArray32Bytes {
+        [FieldOffset(0)] public byte First;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct AtkUnitManager {
+        [FieldOffset(0x6900)] public AtkUnitList AllLoadedUnitsList;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 0x810)]
+    public struct AtkUnitList {
+        [FieldOffset(0x8)] internal FixedSizeArray256Pointers _entries;
+        [FieldOffset(0x808)] public ushort Count;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 0x238)]
+    public struct AtkUnitBase {
+        [FieldOffset(0x8)] internal FixedSizeArray32Bytes _name;
+        [FieldOffset(0x178)] public nint AtkValues;
+
+        [BitField<AtkUnitBaseVisibilityState>("VisibilityState", 20, 4)]
+        [FieldOffset(0x198)]
+        public uint Flags198;
+
+        [BitField<bool>("IsReady", 0)]
+        [FieldOffset(0x1A1)]
+        public byte Flags1A1;
+
+        [FieldOffset(0x1E2)] public ushort AtkValuesCount;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 0x10)]
+    public struct AtkValue {
+        [FieldOffset(0)] public AtkValueType Type;
+        [FieldOffset(0x8)] public nint String;
     }
 }

@@ -47,9 +47,48 @@ internal static partial class ManifestValidator {
         JsonNode utf8 = talk["utf8String"]!;
         int pointer = utf8["stringPointerOffset"]!.GetValue<int>();
         int used = utf8["bufferUsedOffset"]!.GetValue<int>();
-        int length = utf8["stringLengthOffset"]!.GetValue<int>();
-        if (pointer % 8 != 0 || used % 8 != 0 || length % 8 != 0 || !(pointer < used && used < length)) {
-            throw new InvalidOperationException("Utf8String offsets must be ordered and x64-aligned.");
+        if (pointer % 8 != 0 || used % 8 != 0 || pointer >= used
+            || utf8["lengthSource"]!.GetValue<string>() != "bufferUsedMinusNull") {
+            throw new InvalidOperationException("Utf8String pointer and BufUsed offsets must be ordered, x64-aligned, and use BufUsed minus null.");
+        }
+
+        JsonNode current = root["resources"]!["currentTalk"]!;
+        if (current["uiModuleOffset"]!.GetValue<int>() != chat["uiModuleOffset"]!.GetValue<int>()) {
+            throw new InvalidOperationException("CHATLOG, Talk, and CurrentTalk must use the same UIModule offset.");
+        }
+
+        JsonNode unitList = current["atkUnitList"]!;
+        int entriesOffset = unitList["entriesOffset"]!.GetValue<int>();
+        int countOffset = unitList["countOffset"]!.GetValue<int>();
+        int capacity = unitList["capacity"]!.GetValue<int>();
+        int entrySize = unitList["entrySize"]!.GetValue<int>();
+        if (entrySize != 8 || entriesOffset % entrySize != 0
+            || countOffset != entriesOffset + (capacity * entrySize)) {
+            throw new InvalidOperationException("AtkUnitList entries must be a contiguous fixed array of x64 pointers followed by Count.");
+        }
+
+        JsonNode addon = current["atkUnitBase"]!;
+        int nameOffset = addon["nameOffset"]!.GetValue<int>();
+        int nameCapacity = addon["nameCapacity"]!.GetValue<int>();
+        int valuesPointerOffset = addon["atkValuesPointerOffset"]!.GetValue<int>();
+        if (nameOffset + nameCapacity > valuesPointerOffset || valuesPointerOffset % 8 != 0
+            || addon["visibilityMask"]!.GetValue<uint>() == 0
+            || addon["readinessMask"]!.GetValue<uint>() == 0) {
+            throw new InvalidOperationException("AtkUnitBase name, state masks, and AtkValues pointer layout are inconsistent.");
+        }
+
+        JsonNode value = current["atkValue"]!;
+        int valueSize = value["size"]!.GetValue<int>();
+        int typeOffset = value["typeOffset"]!.GetValue<int>();
+        int valueOffset = value["valueOffset"]!.GetValue<int>();
+        if (typeOffset + sizeof(int) > valueSize || valueOffset % 8 != 0 || valueOffset + 8 > valueSize) {
+            throw new InvalidOperationException("AtkValue type and value fields must fit within each x64 AtkValue entry.");
+        }
+
+        int textIndex = current["textValueIndex"]!.GetValue<int>();
+        int nameIndex = current["nameValueIndex"]!.GetValue<int>();
+        if (textIndex < 0 || nameIndex < 0 || textIndex == nameIndex) {
+            throw new InvalidOperationException("CurrentTalk text and name AtkValue indexes must be distinct and non-negative.");
         }
     }
 

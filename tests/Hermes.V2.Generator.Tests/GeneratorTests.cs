@@ -24,7 +24,25 @@ public sealed class GeneratorTests {
         Assert.Equal(0xFEF68, result.TalkTextOffset);
         Assert.Equal(0, result.StringPointerOffset);
         Assert.Equal(0x10, result.BufferUsedOffset);
-        Assert.Equal(0x18, result.StringLengthOffset);
+        Assert.Equal(0xD2670, result.RaptureAtkModuleOffset);
+        Assert.Equal(0x13420, result.RaptureAtkUnitManagerOffset);
+        Assert.Equal(0x6900, result.AllLoadedUnitsListOffset);
+        Assert.Equal(0x8, result.AtkUnitListEntriesOffset);
+        Assert.Equal(0x808, result.AtkUnitListCountOffset);
+        Assert.Equal(256, result.AtkUnitListCapacity);
+        Assert.Equal(8, result.AtkUnitListEntrySize);
+        Assert.Equal(0x8, result.AddonNameOffset);
+        Assert.Equal(32, result.AddonNameCapacity);
+        Assert.Equal(0x198, result.AddonVisibilityStateOffset);
+        Assert.Equal(0x00200000U, result.AddonVisibilityMask);
+        Assert.Equal(0x1A1, result.AddonReadinessOffset);
+        Assert.Equal(0x01U, result.AddonReadinessMask);
+        Assert.Equal(0x178, result.AtkValuesPointerOffset);
+        Assert.Equal(0x1E2, result.AtkValuesCountOffset);
+        Assert.Equal(0x10, result.AtkValueSize);
+        Assert.Equal(0, result.AtkValueTypeOffset);
+        Assert.Equal(0x8, result.AtkValueValueOffset);
+        Assert.Equal(0x28, result.ManagedStringType);
     }
 
     [Theory]
@@ -63,9 +81,35 @@ public sealed class GeneratorTests {
         string root = FindRepositoryRoot();
         string schema = Path.Combine(root, "schemas", "hermes-v2.schema.json");
         JsonNode node = JsonNode.Parse(CanonicalJson.Serialize(CreateManifest()))!;
-        node["resources"]!.AsObject().Remove("talk");
+        node["resources"]!.AsObject().Remove("currentTalk");
 
         Assert.Throws<InvalidOperationException>(() => ManifestValidator.Validate(Encoding.UTF8.GetBytes(node.ToJsonString()), schema));
+    }
+
+    [Fact]
+    public void SchemaRejectsLegacyStringLengthOffset() {
+        string root = FindRepositoryRoot();
+        string schema = Path.Combine(root, "schemas", "hermes-v2.schema.json");
+        JsonNode node = JsonNode.Parse(CanonicalJson.Serialize(CreateManifest()))!;
+        node["resources"]!["talk"]!["utf8String"]!["stringLengthOffset"] = 0x18;
+
+        Assert.Throws<InvalidOperationException>(() => ManifestValidator.Validate(Encoding.UTF8.GetBytes(node.ToJsonString()), schema));
+    }
+
+    [Fact]
+    public void RepositoryCanonicalJsonFilesUseLfWithoutBom() {
+        string root = FindRepositoryRoot();
+        string[] paths = [
+            Path.Combine(root, "schemas", "hermes-v2.schema.json"),
+            Path.Combine(root, "v2", "fixtures", "manifest.valid.json"),
+        ];
+
+        foreach (string path in paths) {
+            byte[] bytes = File.ReadAllBytes(path);
+            Assert.False(bytes.AsSpan().StartsWith(Encoding.UTF8.Preamble));
+            Assert.DoesNotContain((byte)'\r', bytes);
+            Assert.Equal((byte)'\n', bytes[^1]);
+        }
     }
 
     private static HermesManifest CreateManifest() {
@@ -81,7 +125,26 @@ public sealed class GeneratorTests {
             new Roots(new FrameworkRoot("488B1D????????8B7C24", 3, true)),
             new Resources(
                 new ChatLogResource("framework", 0x2B68, 0x1AC0, 0x48, 0x60),
-                new TalkResource("framework", "lastStandardTalk", 0x2B68, 0xFEF00, 0xFEF68, new Utf8StringLayout(0, 0x10, 0x18))),
+                new TalkResource(
+                    "framework",
+                    "lastStandardTalk",
+                    0x2B68,
+                    0xFEF00,
+                    0xFEF68,
+                    new Utf8StringLayout(0, 0x10, "bufferUsedMinusNull")),
+                new CurrentTalkResource(
+                    "framework",
+                    "currentStandardTalk",
+                    0x2B68,
+                    0xD2670,
+                    0x13420,
+                    0x6900,
+                    new AtkUnitListLayout(0x8, 0x808, 256, 8),
+                    new AtkUnitBaseLayout(0x8, 32, 0x198, 0x00200000, 0x1A1, 0x01, 0x178, 0x1E2),
+                    new AtkValueLayout(0x10, 0, 0x8, [0x28]),
+                    "Talk",
+                    0,
+                    1)),
             new Validation("candidate"));
     }
 

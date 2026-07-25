@@ -64,7 +64,36 @@ internal static partial class Program {
                     metadata.UiModuleOffset,
                     metadata.TalkNameOffset,
                     metadata.TalkTextOffset,
-                    new Utf8StringLayout(metadata.StringPointerOffset, metadata.BufferUsedOffset, metadata.StringLengthOffset))),
+                    new Utf8StringLayout(metadata.StringPointerOffset, metadata.BufferUsedOffset, "bufferUsedMinusNull")),
+                new CurrentTalkResource(
+                    "framework",
+                    "currentStandardTalk",
+                    metadata.UiModuleOffset,
+                    metadata.RaptureAtkModuleOffset,
+                    metadata.RaptureAtkUnitManagerOffset,
+                    metadata.AllLoadedUnitsListOffset,
+                    new AtkUnitListLayout(
+                        metadata.AtkUnitListEntriesOffset,
+                        metadata.AtkUnitListCountOffset,
+                        metadata.AtkUnitListCapacity,
+                        metadata.AtkUnitListEntrySize),
+                    new AtkUnitBaseLayout(
+                        metadata.AddonNameOffset,
+                        metadata.AddonNameCapacity,
+                        metadata.AddonVisibilityStateOffset,
+                        metadata.AddonVisibilityMask,
+                        metadata.AddonReadinessOffset,
+                        metadata.AddonReadinessMask,
+                        metadata.AtkValuesPointerOffset,
+                        metadata.AtkValuesCountOffset),
+                    new AtkValueLayout(
+                        metadata.AtkValueSize,
+                        metadata.AtkValueTypeOffset,
+                        metadata.AtkValueValueOffset,
+                        [metadata.ManagedStringType]),
+                    "Talk",
+                    0,
+                    1)),
             validation);
 
         byte[] bytes = CanonicalJson.Serialize(manifest);

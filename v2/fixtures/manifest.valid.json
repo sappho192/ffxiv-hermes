@@ -38,8 +38,41 @@
       "utf8String": {
         "stringPointerOffset": 0,
         "bufferUsedOffset": 16,
-        "stringLengthOffset": 24
+        "lengthSource": "bufferUsedMinusNull"
       }
+    },
+    "currentTalk": {
+      "root": "framework",
+      "semantics": "currentStandardTalk",
+      "uiModuleOffset": 11112,
+      "raptureAtkModuleOffset": 861808,
+      "raptureAtkUnitManagerOffset": 78880,
+      "allLoadedUnitsListOffset": 26880,
+      "atkUnitList": {
+        "entriesOffset": 8,
+        "countOffset": 2056,
+        "capacity": 256,
+        "entrySize": 8
+      },
+      "atkUnitBase": {
+        "nameOffset": 8,
+        "nameCapacity": 32,
+        "visibilityStateOffset": 408,
+        "visibilityMask": 2097152,
+        "readinessOffset": 417,
+        "readinessMask": 1,
+        "atkValuesPointerOffset": 376,
+        "atkValuesCountOffset": 482
+      },
+      "atkValue": {
+        "size": 16,
+        "typeOffset": 0,
+        "valueOffset": 8,
+        "allowedStringTypes": [40]
+      },
+      "addonName": "Talk",
+      "textValueIndex": 0,
+      "nameValueIndex": 1
     }
   },
   "validation": {
