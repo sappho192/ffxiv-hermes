@@ -204,8 +204,8 @@ jobs:
           revision="$(cat publish-v2/revision.txt)"
           base="${V2_PUBLIC_BASE_URL%/}"
           for attempt in {1..13}; do
-            curl --fail --silent --show-error --max-time 15 "$base/latest.json" -o publish-v2/public-latest.json
-            if [[ "$(jq -r '.resourceRevision' publish-v2/public-latest.json)" == "$revision" ]]; then
+            if curl --fail --silent --show-error --max-time 15 "$base/latest.json" -o publish-v2/public-latest.json \
+              && [[ "$(jq -r '.resourceRevision' publish-v2/public-latest.json)" == "$revision" ]]; then
               break
             fi
             if [[ "$attempt" == 13 ]]; then
@@ -214,7 +214,9 @@ jobs:
             fi
             sleep 10
           done
-          curl --fail --silent --show-error --max-time 15 "$base/manifests/$revision.json" -o publish-v2/public-manifest.json
+          curl --retry 12 --retry-all-errors --retry-delay 10 \
+            --fail --silent --show-error --max-time 15 \
+            "$base/manifests/$revision.json" -o publish-v2/public-manifest.json
           test "$(dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- revision --manifest publish-v2/public-manifest.json)" = "$revision"
 
       - name: Record production state in git
