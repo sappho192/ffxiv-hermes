@@ -58,7 +58,9 @@ instance. A static build or candidate CI pass is not live evidence.
 - Production workflow: `.github/workflows/publish-v2.yml`.
 - Protected environment: `main`.
 - Do not copy credential identifiers, reviewer identities, account IDs, local user paths, process
-  IDs, or raw game dialogue into public documentation.
+  IDs, player names, user-generated chat, NPC names, or raw NPC dialogue into public documentation.
+  Exact Talk strings may be viewed transiently in a local agent diagnostic session, but retain only
+  match status, source, visibility, and lengths in committed artifacts.
 - Inspect current security-sensitive configuration with read-only commands instead:
 
 ```powershell

@@ -43,8 +43,10 @@ fallback을 지원한다. 다른 발화 유형은 v2의 선택적 리소스로 �
 이 문서는 세 저장소의 상위 아키텍처와 Hermes 계약을 정의한다. 저장소별 구현 작업은 다음 문서를 따른다.
 
 ```text
-D:\REPO\sharlayan\docs\2026-07-22\2026-07-22-06-hermes-v2-runtime-plan.md
-D:\REPO\IronworksTranslator\HERMES_V2_MIGRATION_PLAN.md
+sappho192/Sharlayan.Lite:
+  docs/2026-07-22/2026-07-22-06-hermes-v2-runtime-plan.md
+IronworksTranslator:
+  docs/2026-07-22-hermes-v2-upstream-status.md
 ```
 
 저장소별 문서는 이 문서의 schema를 복제해 독립적으로 변경하지 않는다. 계약 변경은 Hermes schema, fixture, Sharlayan consumer, IronworksTranslator integration 순서로 반영한다.
@@ -631,9 +633,9 @@ public TalkResult GetTalk();
 - [x] `GetLastTalk()` 구현
 - [x] provider, pointer resolver 및 UTF-8 reader 테스트 추가
 - [x] resource revision 진단 정보 추가
-- [ ] `currentTalk` DTO와 semantic validator 추가
-- [ ] `GetCurrentTalk()` 및 current-first `GetTalk()` 추가
-- [ ] Current/Last 분리 단위 테스트와 live smoke 옵션 추가
+- [x] `currentTalk` DTO와 semantic validator 추가
+- [x] `GetCurrentTalk()` 및 current-first `GetTalk()` 추가
+- [x] Current/Last 분리 단위 테스트와 live smoke 옵션 추가
 
 완료 조건:
 
@@ -645,7 +647,7 @@ public TalkResult GetTalk();
 
 현재 작업 범위에서는 애플리케이션 코드를 변경하지 않는다. Hermes와
 Sharlayan.Lite의 구현 상태 및 향후 연동 계약만
-`D:\REPO\IronworksTranslator\docs\2026-07-22-hermes-v2-upstream-status.md`에
+IronworksTranslator 저장소의 `docs/2026-07-22-hermes-v2-upstream-status.md`에
 기록했다.
 
 - [ ] Hermes JSON 직접 다운로드 제거
@@ -670,7 +672,7 @@ Sharlayan.Lite의 구현 상태 및 향후 연동 계약만
 - [x] 변경 시 candidate PR 생성
 - [x] 변경 없음 상태 처리 구현
 - [x] Action dependency commit pin 적용
-- [x] repository secret `HERMES_CANDIDATE_TOKEN` 설정
+- [x] candidate workflow가 참조하는 repository credential 설정
 
 완료 조건:
 
@@ -684,10 +686,10 @@ Sharlayan.Lite의 구현 상태 및 향후 연동 계약만
 - [x] Sharlayan live smoke에 v2 manifest 입력 지원 추가
 - [x] CHATLOG 및 Talk 실제 게임 검증 절차 구현
 - [x] `publish-v2.yml` 추가
-- [x] GitHub repository R2 secret 설정
+- [x] GitHub production environment credential 설정
 - [x] 기존 `main` protected environment 사용 결정
-- [x] `main` required reviewer와 deployment branch policy 설정
-- [ ] Sharlayan.Lite 9.1.2 배포 및 embedded manifest 동기화
+- [x] `main` approval 및 deployment branch policy 설정
+- [x] Sharlayan.Lite 9.1.2 배포 및 embedded manifest 동기화
 - [x] immutable upload, checksum read-back 및 latest-last 적용
 - [x] rollback dispatch 구현
 - [x] R2 cache-control 및 content-type 설정
@@ -758,11 +760,12 @@ v2 전환은 다음 조건을 모두 만족할 때 완료된 것으로 본다.
 
 - [확정] v2 public base URL: `https://hermes.sapphosound.com/v2/`
 - [확정] 최초 `minimumSharlayanVersion`: `9.1.2`
-- [확정] live smoke: 수동 유지. 게임 2FA와 GPU instance가 필요하므로 self-hosted
-  automation은 도입하지 않는다.
-- [확정] candidate PR: repository secret `HERMES_CANDIDATE_TOKEN`에 저장한
-  fine-grained PAT 사용
-- [확정] production 승인자: `sappho192`, protected environment: `main`
+- [확정] live smoke: interactive game session과 GPU-capable Windows 환경이 필요하므로
+  수동 유지
+- [확정] candidate PR: workflow가 참조하는 전용 repository credential 사용. 현재
+  식별자와 등록 여부는 workflow 및 `gh secret list`로 확인
+- [확정] production: protected environment `main` 사용. 현재 reviewer와 branch policy는
+  GitHub Environment API로 확인
 - [확정] immutable cache-control: `public,max-age=31536000,immutable`
 - [확정] latest cache-control: `public,max-age=0,s-maxage=60,must-revalidate`
 - [확정] legacy endpoint: 무기한 유지

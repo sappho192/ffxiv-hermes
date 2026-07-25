@@ -104,8 +104,8 @@ Candidate JSON 자체를 production object로 승격하지 않으며, production
 
 이 결과를 바탕으로 manifest에 `currentStandardTalk` 리소스를 추가했다. Sharlayan의 기본
 정책은 `Current` 우선, 현재 addon이 없거나 일시적으로 읽을 수 없을 때 `Last` fallback이다.
-실제 문자열은 사용자 동의가 있는 로컬 진단에서만 출력했고, 기본 공유 로그는 source,
-visibility 및 길이만 남긴다.
+실제 문자열은 일시적인 로컬 에이전트 진단에서만 화면과 대조하고 public 문서나 공유 로그에
+보존하지 않는다. Public 증거에는 source, visibility, 길이 및 화면 일치 여부만 남긴다.
 
 ## 실제 게임 검증
 

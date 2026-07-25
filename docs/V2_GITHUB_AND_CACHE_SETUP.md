@@ -4,32 +4,30 @@
 
 ## 확인된 현재 상태
 
-GitHub API로 `sappho192/ffxiv-hermes`를 확인한 결과 `main` environment에 다음
-environment secret 네 개가 존재한다. 값은 GitHub에서 조회할 수 없으며 확인하지 않았다.
-
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_DEFAULT_REGION`
-- `AWS_DEFAULT_OUTPUT`
-
 R2 endpoint, bucket 이름 및 public v2 base URL은 workflow에 공개 설정값으로 고정하며
 secret으로 취급하지 않는다.
 
-Repository Actions secret `HERMES_CANDIDATE_TOKEN`은 2026-07-23에 설정된 것을 GitHub
-API에서 이름으로 확인했다. Secret 값은 조회하지 않았다.
+Public 문서에는 credential 식별자, reviewer identity, self-review 및 administrator bypass
+상태를 고정해 기록하지 않는다. 현재 설정은 값을 노출하지 않는 다음 읽기 전용 명령으로
+확인한다.
 
-같은 날 `main` environment의 required reviewer가 `sappho192`로 설정되고
-`prevent_self_review=false`인 것과, deployment branch policy에 정확한 `main` branch가
-등록된 것을 GitHub API로 확인했다. Administrator bypass는 현재 허용 상태다.
+```powershell
+rg -n '\$\{\{\s*secrets\.' .github/workflows
+gh secret list --repo sappho192/ffxiv-hermes
+gh secret list --repo sappho192/ffxiv-hermes --env main
+gh api repos/sappho192/ffxiv-hermes/environments/main
+gh api repos/sappho192/ffxiv-hermes/environments/main/deployment-branch-policies
+```
+
+`gh secret list`는 등록된 식별자와 metadata만 표시하며 secret 값은 반환하지 않는다.
 
 ## Production environment
 
-Repository의 **Settings → Environments → main**에서 다음을 설정한다.
+Repository의 **Settings → Environments → main**에서 다음을 확인한다.
 
 1. Deployment branches and tags에서 selected branch로 정확히 `main`을 추가한다.
-2. Required reviewers에 `sappho192`를 추가한다.
-3. 유일한 승인자가 workflow 실행자와 같으므로 **Prevent self-review**는 끈다.
-4. 승인 절차를 실제 gate로 강제하려면 동작 확인 후 administrator bypass를 끈다.
+2. Required reviewer와 self-review 정책이 현재 운영 주체의 승인 모델에 맞는지 확인한다.
+3. Administrator bypass 정책이 의도한 release gate와 일치하는지 확인한다.
 
 `publish-v2.yml`은 `main` environment를 사용하며, workflow 자체도 `main`의 현재 HEAD에서
 dispatch된 실행만 허용한다. Environment approval 전에는 R2 secret이 job에 제공되지 않는다.
@@ -41,8 +39,7 @@ dispatch된 실행만 허용한다. Environment approval 전에는 R2 secret이 
 Candidate job에는 production environment를 연결하지 않는다. Candidate branch push와 PR 생성용
 fine-grained personal access token을 다음 최소 범위로 만든다.
 
-- Resource owner: `sappho192`
-- Repository access: **Only select repositories** → `ffxiv-hermes`
+- Repository access: **Only select repositories**에서 이 저장소만 선택
 - Repository permissions:
   - **Contents: Read and write**
   - **Pull requests: Read and write**
@@ -50,17 +47,20 @@ fine-grained personal access token을 다음 최소 범위로 만든다.
 - Expiration: 운영 가능한 짧은 주기(권장 90일)로 설정하고 만료 전에 교체
 
 Repository의 **Settings → Secrets and variables → Actions → New repository secret**에서
-토큰을 `HERMES_CANDIDATE_TOKEN`이라는 repository secret으로 저장한다. `main` environment
-secret으로 저장하면 environment를 사용하지 않는 candidate job에서 읽을 수 없으므로 안 된다.
-
-CLI로 설정할 때는 토큰을 명령행 인자로 남기지 않고 다음 명령이 표시하는 비공개 입력에 붙여
-넣는다.
+workflow가 참조하는 repository secret에 토큰을 저장한다. 정확한 식별자는 workflow에서
+확인한다. Protected environment secret으로 저장하면 environment를 사용하지 않는 candidate
+job에서 읽을 수 없으므로 안 된다.
 
 ```powershell
-gh secret set HERMES_CANDIDATE_TOKEN --repo sappho192/ffxiv-hermes
+rg -n '\$\{\{\s*secrets\.' .github/workflows/fcs-v2-candidate.yml
+gh secret list --repo sappho192/ffxiv-hermes
 ```
 
-Workflow의 checkout, branch push 및 `gh pr create`가 모두 이 PAT를 사용한다. PAT를 사용하면
+등록 또는 교체 시에는 workflow에서 확인한 식별자를 사용하고, token을 명령행 인자로 남기지
+않으며 `gh secret set`이 표시하는 비공개 입력으로 전달한다.
+
+Workflow의 checkout, branch push 및 `gh pr create`가 모두 이 credential을 사용한다. 전용
+credential을 사용하면
 자동 생성 PR의 `pull_request` workflow가 `GITHUB_TOKEN` 생성 PR처럼 별도 승인 대기 상태가
 되는 것을 피할 수 있다.
 
