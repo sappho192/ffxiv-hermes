@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 2,
+  "compatibility": {
+    "minimumSharlayanVersion": "9.1.2",
+    "pointerResolverVersion": 1
+  },
+  "source": {
+    "fcsRepository": "https://github.com/aers/FFXIVClientStructs.git",
+    "fcsCommit": "8ff04195c4e77ef0b85d15c6fd1c67785378f0fb",
+    "generatorRepository": "https://github.com/sappho192/ffxiv-hermes.git",
+    "generatorCommit": "746414d55919677c79f6c3709f839ace556551aa"
+  },
+  "platform": {
+    "process": "ffxiv_dx11.exe",
+    "architecture": "x64"
+  },
+  "roots": {
+    "framework": {
+      "pattern": "488B1D????????8B7C24",
+      "relativeFollowOffset": 3,
+      "isPointer": true
+    }
+  },
+  "resources": {
+    "chatLog": {
+      "root": "framework",
+      "uiModuleOffset": 11112,
+      "raptureLogModuleOffset": 6848,
+      "indexVectorOffset": 72,
+      "dataVectorOffset": 96
+    },
+    "talk": {
+      "root": "framework",
+      "semantics": "lastStandardTalk",
+      "uiModuleOffset": 11112,
+      "nameOffset": 1044224,
+      "textOffset": 1044328,
+      "utf8String": {
+        "stringPointerOffset": 0,
+        "bufferUsedOffset": 16,
+        "lengthSource": "bufferUsedMinusNull"
+      }
+    },
+    "currentTalk": {
+      "root": "framework",
+      "semantics": "currentStandardTalk",
+      "uiModuleOffset": 11112,
+      "raptureAtkModuleOffset": 861808,
+      "raptureAtkUnitManagerOffset": 78880,
+      "allLoadedUnitsListOffset": 26880,
+      "atkUnitList": {
+        "entriesOffset": 8,
+        "countOffset": 2056,
+        "capacity": 256,
+        "entrySize": 8
+      },
+      "atkUnitBase": {
+        "nameOffset": 8,
+        "nameCapacity": 32,
+        "visibilityStateOffset": 408,
+        "visibilityMask": 2097152,
+        "readinessOffset": 417,
+        "readinessMask": 1,
+        "atkValuesPointerOffset": 376,
+        "atkValuesCountOffset": 482
+      },
+      "atkValue": {
+        "size": 16,
+        "typeOffset": 0,
+        "valueOffset": 8,
+        "allowedStringTypes": [
+          40
+        ]
+      },
+      "addonName": "Talk",
+      "textValueIndex": 0,
+      "nameValueIndex": 1
+    }
+  },
+  "validation": {
+    "status": "live-verified",
+    "gameVersion": "2026.06.18.0000.0000",
+    "executableSha256": "4236e770e673150e85f8d10beab2fc4834c82f86aab8a555a9175439fc906a6d",
+    "verifierCommit": "3e27261f82851e1e88c413a25461e6ca0ad551e8"
+  }
+}
