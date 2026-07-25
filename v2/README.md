@@ -25,3 +25,15 @@ Generated pull requests keep unverified manifests and review summaries in
 `candidates/`. A candidate becomes deployable only when the protected publish
 workflow rebuilds it with `live-verified` metadata; candidate files are never
 uploaded to R2.
+
+The first production manifest requires three runtime resources:
+
+- `chatLog`: persistent chat log vectors.
+- `talk`: the last committed standard Talk value, used only as a fallback.
+- `currentTalk`: the visible standard `Talk` addon's current text and speaker.
+
+`talk.utf8String.lengthSource` is `bufferUsedMinusNull`; consumers must not use
+FCS `Utf8String.StringLength` as the authoritative byte length. `currentTalk`
+describes the FCS-derived addon-list, addon-state, and `AtkValue` layouts together
+with the semantic constants `Talk`, text index `0`, name index `1`, and allowed
+`ManagedString` type `0x28`.

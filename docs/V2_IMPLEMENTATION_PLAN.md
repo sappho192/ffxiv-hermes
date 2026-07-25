@@ -35,7 +35,8 @@ v2의 우선 목표는 다음과 같다.
 - 원격 manifest만을 유일한 fallback으로 사용하는 구조
 - FCS의 새 커밋을 검증 없이 즉시 production으로 승격하는 기능
 
-초기 v2는 지속 채팅 로그와 표준 `Talk`의 마지막 이름 및 대사만 지원한다. 다른 발화 유형은 v2의 선택적 리소스로 점진적으로 추가한다.
+초기 production v2는 지속 채팅 로그, 표준 `Talk`의 현재 표시값, 그리고 직전 확정값
+fallback을 지원한다. 다른 발화 유형은 v2의 선택적 리소스로 점진적으로 추가한다.
 
 ## 저장소별 실행 계획
 
@@ -71,7 +72,7 @@ D:\REPO\IronworksTranslator\HERMES_V2_MIGRATION_PLAN.md
 - 원격, 로컬 캐시, embedded manifest 순으로 리소스를 선택한다.
 - 시그니처 검색과 포인터 해석을 담당한다.
 - CHATLOG 구조를 설정하고 기존 채팅 API를 제공한다.
-- `LastTalkName`과 `LastTalkText`를 안전하게 읽는 고수준 API를 제공한다.
+- 현재 표시 중인 `Talk`와 `LastTalkName`/`LastTalkText` fallback을 구분하는 고수준 API를 제공한다.
 - Hermes 스키마와 현재 라이브러리의 호환성을 검사한다.
 
 ### IronworksTranslator
@@ -204,8 +205,41 @@ v2 manifest는 FCS의 C# 타입을 그대로 노출하지 않고 Sharlayan이 �
       "utf8String": {
         "stringPointerOffset": 0,
         "bufferUsedOffset": 16,
-        "stringLengthOffset": 24
+        "lengthSource": "bufferUsedMinusNull"
       }
+    },
+    "currentTalk": {
+      "root": "framework",
+      "semantics": "currentStandardTalk",
+      "uiModuleOffset": 11112,
+      "raptureAtkModuleOffset": 861808,
+      "raptureAtkUnitManagerOffset": 78880,
+      "allLoadedUnitsListOffset": 26880,
+      "atkUnitList": {
+        "entriesOffset": 8,
+        "countOffset": 2056,
+        "capacity": 256,
+        "entrySize": 8
+      },
+      "atkUnitBase": {
+        "nameOffset": 8,
+        "nameCapacity": 32,
+        "visibilityStateOffset": 408,
+        "visibilityMask": 2097152,
+        "readinessOffset": 417,
+        "readinessMask": 1,
+        "atkValuesPointerOffset": 376,
+        "atkValuesCountOffset": 482
+      },
+      "atkValue": {
+        "size": 16,
+        "typeOffset": 0,
+        "valueOffset": 8,
+        "allowedStringTypes": [40]
+      },
+      "addonName": "Talk",
+      "textValueIndex": 0,
+      "nameValueIndex": 1
     }
   },
   "validation": {
@@ -226,7 +260,7 @@ v2 manifest는 FCS의 C# 타입을 그대로 노출하지 않고 Sharlayan이 �
 - SHA는 40자리 소문자 16진수만 허용한다.
 - 패턴은 공백 없는 대문자 16진수와 `??` wildcard만 허용한다.
 - 모든 오프셋은 허용 범위를 검사하고 unchecked 정수 변환을 금지한다.
-- 필수 리소스는 `chatLog`와 `talk`이다.
+- 최초 production의 필수 리소스는 `chatLog`, `talk`, `currentTalk`이다.
 - 이후 발화 유형은 optional property로만 추가한다.
 - 필드 의미나 포인터 해석 규칙이 바뀌면 v3를 만든다.
 - `minimumSharlayanVersion`보다 낮은 클라이언트는 해당 manifest를 적용하지 않는다.
@@ -255,9 +289,25 @@ v2 manifest는 FCS의 C# 타입을 그대로 노출하지 않고 Sharlayan이 �
 - `UIModule.LastTalkText`
 - `Utf8String.StringPtr`
 - `Utf8String.BufUsed`
-- `Utf8String.StringLength`
 
-`LastTalkName`과 `LastTalkText`는 마지막 표준 Talk 값을 나타내며 현재 대화창 활성 상태를 보장하지 않는다. 이 의미를 숨기지 않고 manifest의 `semantics`에 기록한다.
+`Utf8String`의 유효 byte 길이는 FCS와 동일하게 `BufUsed - 1`로 계산한다.
+`StringLength`는 실제 `LastTalk`에서 0일 수 있으므로 Hermes 계약에 포함하지 않는다.
+
+`LastTalkName`과 `LastTalkText`는 마지막 표준 Talk 값을 나타내며 현재 대화창 활성 상태를
+보장하지 않는다. 이 의미를 숨기지 않고 manifest의 `semantics`에 기록한다.
+
+### 현재 표시 중인 표준 NPC Talk
+
+- `UIModule.RaptureAtkModule`
+- `RaptureAtkModule.RaptureAtkUnitManager`
+- `AtkUnitManager.AllLoadedUnitsList`
+- `AtkUnitList` entries, count 및 capacity
+- `AtkUnitBase` addon name, readiness, visibility, `AtkValues` 및 count
+- `AtkValue` size, type 및 string pointer
+
+`Talk` addon의 현재 관측 계약은 `AtkValues[0]`이 본문, `AtkValues[1]`이 화자이며 두 값의
+허용 타입은 `ManagedString(0x28)`이다. 구조 오프셋과 bit mask는 FCS assembly metadata에서
+추출하고, addon 이름과 index는 manifest의 명시적 semantic 상수로 기록한다.
 
 ## 8. Generator 계획
 
@@ -425,24 +475,32 @@ IronworksTranslator가 메모리 구조를 알 필요가 없도록 고수준 API
 
 ```csharp
 public sealed class TalkResult {
+    public TalkSource Source { get; init; }
+    public bool IsVisible { get; init; }
+    public bool IsAvailable { get; init; }
     public string Name { get; init; }
     public string Text { get; init; }
 }
 
+public TalkResult GetCurrentTalk();
 public TalkResult GetLastTalk();
+public TalkResult GetTalk();
 ```
 
 구현 규칙:
 
-- `Utf8String.StringPtr`와 `StringLength`를 읽는다.
+- `LastTalk`의 길이는 `Utf8String.StringPtr`와 `BufUsed - 1`로 결정한다.
 - 고정 2048바이트 전체를 무조건 읽지 않는다.
 - 최대 허용 길이를 적용한다.
-- header를 읽은 뒤 pointer 또는 length가 바뀌면 한 번 재시도한다.
+- header를 읽은 뒤 pointer 또는 `BufUsed`가 바뀌면 한 번 재시도한다.
 - UTF-8 경계와 null terminator를 안전하게 처리한다.
 - 읽기 실패 시 빈 결과 또는 명시적인 unavailable 상태를 반환한다.
 - 이름과 대사는 가능한 한 같은 snapshot에서 읽는다.
+- `CurrentTalk`은 exact addon name, readiness, visibility, AtkValue count/type을 모두 검증한다.
+- `GetTalk()`은 현재 표시값을 우선하고 unavailable일 때만 `LastTalk` fallback을 반환한다.
 
-`GetLastTalk`은 현재 표시 여부를 의미하지 않는다. 필요하면 이후 `TalkResult`에 revision 또는 관측 시각이 아닌 raw state 정보를 추가하되, FCS에서 검증할 수 없는 활성 상태를 추측해서 제공하지 않는다.
+`GetCurrentTalk()`은 활성 `Talk` addon만 반환하고 `GetLastTalk()`은 직전 확정값만 반환한다.
+두 API의 의미를 섞지 않으며, attach 시 이미 남아 있던 `LastTalk`는 baseline으로 처리한다.
 
 ### 진단 정보
 
@@ -460,7 +518,7 @@ public TalkResult GetLastTalk();
 - `HermesAddress.GetLatestAddress()` 직접 호출을 제거한다.
 - `ALLMESSAGES`라는 사용자 정의 `Signature` 등록을 제거한다.
 - `GetString(..., 2048)` 기반 NPC 대화 polling을 제거한다.
-- Sharlayan의 `GetLastTalk()`을 사용한다.
+- Sharlayan의 current-first `GetTalk()`을 사용한다.
 - 이름과 대사를 함께 번역 파이프라인에 전달한다.
 - 프로세스 attach 직후 남아 있는 `LastTalk` 값을 baseline으로 저장하고 신규 대사로 처리하지 않는다.
 - 값 변경만이 아니라 대화 session 종료와 재시작을 표현할 방법을 후속 검토한다.
@@ -553,11 +611,15 @@ public TalkResult GetLastTalk();
 - [x] 현재 pinned FCS commit으로 deterministic manifest 생성
 - [x] generator unit test 추가
 - [x] `resourceRevision` 계산 규칙 문서화
+- [x] `Utf8String` 길이 계약을 `BufUsed - 1`로 수정
+- [x] 필수 `currentTalk` resource와 FCS metadata 추출 추가
+- [x] canonical JSON 경로의 LF checkout 강제
+- [x] Windows CI에서 Git blob과 working-copy canonical byte 일치 검증
 
 완료 조건:
 
 - 같은 FCS 및 generator commit으로 두 번 실행한 결과가 byte-identical이다.
-- 현재 CHATLOG와 `LastTalkName` 및 `LastTalkText` 값이 생성된다.
+- 현재 CHATLOG, `LastTalkName`/`LastTalkText`, `Talk` addon layout이 생성된다.
 - 생성 결과가 JSON Schema를 통과한다.
 
 ### Phase 2: Sharlayan v2 consumer
@@ -569,6 +631,9 @@ public TalkResult GetLastTalk();
 - [x] `GetLastTalk()` 구현
 - [x] provider, pointer resolver 및 UTF-8 reader 테스트 추가
 - [x] resource revision 진단 정보 추가
+- [ ] `currentTalk` DTO와 semantic validator 추가
+- [ ] `GetCurrentTalk()` 및 current-first `GetTalk()` 추가
+- [ ] Current/Last 분리 단위 테스트와 live smoke 옵션 추가
 
 완료 조건:
 
@@ -585,7 +650,7 @@ Sharlayan.Lite의 구현 상태 및 향후 연동 계약만
 
 - [ ] Hermes JSON 직접 다운로드 제거
 - [ ] `ALLMESSAGES` custom signature 제거
-- [ ] Sharlayan `GetLastTalk()` 사용
+- [ ] Sharlayan current-first `GetTalk()` 사용
 - [ ] NPC 이름과 대사를 함께 처리
 - [ ] attach baseline과 중복 처리 보완
 - [ ] fallback 및 재연결 테스트 추가
@@ -638,7 +703,8 @@ Sharlayan.Lite의 구현 상태 및 향후 연동 계약만
 
 - [x] legacy endpoint를 무기한 유지하기로 결정
 - [ ] `latest/address.json` 수동 갱신 중단
-- [ ] Talk 활성 상태 판별 가능성 조사
+- [x] Talk 활성 상태 판별 가능성 조사
+- [x] Hermes `currentTalk` manifest 계약 구현
 - [ ] `TalkSubtitle` 리소스 검토
 - [ ] `NpcYell` 및 말풍선 리소스 검토
 - [ ] BattleTalk의 누락된 FCS semantic metadata 추적

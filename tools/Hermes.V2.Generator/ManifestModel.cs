@@ -34,7 +34,8 @@ internal sealed record FrameworkRoot(
 
 internal sealed record Resources(
     [property: JsonPropertyOrder(0)] ChatLogResource ChatLog,
-    [property: JsonPropertyOrder(1)] TalkResource Talk);
+    [property: JsonPropertyOrder(1)] TalkResource Talk,
+    [property: JsonPropertyOrder(2)] CurrentTalkResource CurrentTalk);
 
 internal sealed record ChatLogResource(
     [property: JsonPropertyOrder(0)] string Root,
@@ -54,7 +55,43 @@ internal sealed record TalkResource(
 internal sealed record Utf8StringLayout(
     [property: JsonPropertyOrder(0)] int StringPointerOffset,
     [property: JsonPropertyOrder(1)] int BufferUsedOffset,
-    [property: JsonPropertyOrder(2)] int StringLengthOffset);
+    [property: JsonPropertyOrder(2)] string LengthSource);
+
+internal sealed record CurrentTalkResource(
+    [property: JsonPropertyOrder(0)] string Root,
+    [property: JsonPropertyOrder(1)] string Semantics,
+    [property: JsonPropertyOrder(2)] int UiModuleOffset,
+    [property: JsonPropertyOrder(3)] int RaptureAtkModuleOffset,
+    [property: JsonPropertyOrder(4)] int RaptureAtkUnitManagerOffset,
+    [property: JsonPropertyOrder(5)] int AllLoadedUnitsListOffset,
+    [property: JsonPropertyOrder(6)] AtkUnitListLayout AtkUnitList,
+    [property: JsonPropertyOrder(7)] AtkUnitBaseLayout AtkUnitBase,
+    [property: JsonPropertyOrder(8)] AtkValueLayout AtkValue,
+    [property: JsonPropertyOrder(9)] string AddonName,
+    [property: JsonPropertyOrder(10)] int TextValueIndex,
+    [property: JsonPropertyOrder(11)] int NameValueIndex);
+
+internal sealed record AtkUnitListLayout(
+    [property: JsonPropertyOrder(0)] int EntriesOffset,
+    [property: JsonPropertyOrder(1)] int CountOffset,
+    [property: JsonPropertyOrder(2)] int Capacity,
+    [property: JsonPropertyOrder(3)] int EntrySize);
+
+internal sealed record AtkUnitBaseLayout(
+    [property: JsonPropertyOrder(0)] int NameOffset,
+    [property: JsonPropertyOrder(1)] int NameCapacity,
+    [property: JsonPropertyOrder(2)] int VisibilityStateOffset,
+    [property: JsonPropertyOrder(3)] uint VisibilityMask,
+    [property: JsonPropertyOrder(4)] int ReadinessOffset,
+    [property: JsonPropertyOrder(5)] uint ReadinessMask,
+    [property: JsonPropertyOrder(6)] int AtkValuesPointerOffset,
+    [property: JsonPropertyOrder(7)] int AtkValuesCountOffset);
+
+internal sealed record AtkValueLayout(
+    [property: JsonPropertyOrder(0)] int Size,
+    [property: JsonPropertyOrder(1)] int TypeOffset,
+    [property: JsonPropertyOrder(2)] int ValueOffset,
+    [property: JsonPropertyOrder(3)] IReadOnlyList<int> AllowedStringTypes);
 
 internal sealed record Validation(
     [property: JsonPropertyOrder(0)] string Status,
@@ -74,4 +111,22 @@ internal sealed record ExtractedMetadata(
     int TalkTextOffset,
     int StringPointerOffset,
     int BufferUsedOffset,
-    int StringLengthOffset);
+    int RaptureAtkModuleOffset,
+    int RaptureAtkUnitManagerOffset,
+    int AllLoadedUnitsListOffset,
+    int AtkUnitListEntriesOffset,
+    int AtkUnitListCountOffset,
+    int AtkUnitListCapacity,
+    int AtkUnitListEntrySize,
+    int AddonNameOffset,
+    int AddonNameCapacity,
+    int AddonVisibilityStateOffset,
+    uint AddonVisibilityMask,
+    int AddonReadinessOffset,
+    uint AddonReadinessMask,
+    int AtkValuesPointerOffset,
+    int AtkValuesCountOffset,
+    int AtkValueSize,
+    int AtkValueTypeOffset,
+    int AtkValueValueOffset,
+    int ManagedStringType);

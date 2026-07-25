@@ -27,11 +27,20 @@
     "source": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["fcsRepository", "fcsCommit", "generatorRepository", "generatorCommit"],
+      "required": [
+        "fcsRepository",
+        "fcsCommit",
+        "generatorRepository",
+        "generatorCommit"
+      ],
       "properties": {
-        "fcsRepository": { "const": "https://github.com/aers/FFXIVClientStructs.git" },
+        "fcsRepository": {
+          "const": "https://github.com/aers/FFXIVClientStructs.git"
+        },
         "fcsCommit": { "$ref": "#/$defs/gitSha" },
-        "generatorRepository": { "const": "https://github.com/sappho192/ffxiv-hermes.git" },
+        "generatorRepository": {
+          "const": "https://github.com/sappho192/ffxiv-hermes.git"
+        },
         "generatorCommit": { "$ref": "#/$defs/gitSha" }
       }
     },
@@ -54,13 +63,19 @@
     },
     "resources": {
       "type": "object",
-      "additionalProperties": true,
-      "required": ["chatLog", "talk"],
+      "additionalProperties": false,
+      "required": ["chatLog", "talk", "currentTalk"],
       "properties": {
         "chatLog": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["root", "uiModuleOffset", "raptureLogModuleOffset", "indexVectorOffset", "dataVectorOffset"],
+          "required": [
+            "root",
+            "uiModuleOffset",
+            "raptureLogModuleOffset",
+            "indexVectorOffset",
+            "dataVectorOffset"
+          ],
           "properties": {
             "root": { "const": "framework" },
             "uiModuleOffset": { "$ref": "#/$defs/offset" },
@@ -72,7 +87,14 @@
         "talk": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["root", "semantics", "uiModuleOffset", "nameOffset", "textOffset", "utf8String"],
+          "required": [
+            "root",
+            "semantics",
+            "uiModuleOffset",
+            "nameOffset",
+            "textOffset",
+            "utf8String"
+          ],
           "properties": {
             "root": { "const": "framework" },
             "semantics": { "const": "lastStandardTalk" },
@@ -82,13 +104,110 @@
             "utf8String": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["stringPointerOffset", "bufferUsedOffset", "stringLengthOffset"],
+              "required": [
+                "stringPointerOffset",
+                "bufferUsedOffset",
+                "lengthSource"
+              ],
               "properties": {
                 "stringPointerOffset": { "$ref": "#/$defs/offset" },
                 "bufferUsedOffset": { "$ref": "#/$defs/offset" },
-                "stringLengthOffset": { "$ref": "#/$defs/offset" }
+                "lengthSource": { "const": "bufferUsedMinusNull" }
               }
             }
+          }
+        },
+        "currentTalk": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root",
+            "semantics",
+            "uiModuleOffset",
+            "raptureAtkModuleOffset",
+            "raptureAtkUnitManagerOffset",
+            "allLoadedUnitsListOffset",
+            "atkUnitList",
+            "atkUnitBase",
+            "atkValue",
+            "addonName",
+            "textValueIndex",
+            "nameValueIndex"
+          ],
+          "properties": {
+            "root": { "const": "framework" },
+            "semantics": { "const": "currentStandardTalk" },
+            "uiModuleOffset": { "$ref": "#/$defs/offset" },
+            "raptureAtkModuleOffset": { "$ref": "#/$defs/offset" },
+            "raptureAtkUnitManagerOffset": { "$ref": "#/$defs/offset" },
+            "allLoadedUnitsListOffset": { "$ref": "#/$defs/offset" },
+            "atkUnitList": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "entriesOffset",
+                "countOffset",
+                "capacity",
+                "entrySize"
+              ],
+              "properties": {
+                "entriesOffset": { "$ref": "#/$defs/offset" },
+                "countOffset": { "$ref": "#/$defs/offset" },
+                "capacity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4096
+                },
+                "entrySize": { "const": 8 }
+              }
+            },
+            "atkUnitBase": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "nameOffset",
+                "nameCapacity",
+                "visibilityStateOffset",
+                "visibilityMask",
+                "readinessOffset",
+                "readinessMask",
+                "atkValuesPointerOffset",
+                "atkValuesCountOffset"
+              ],
+              "properties": {
+                "nameOffset": { "$ref": "#/$defs/offset" },
+                "nameCapacity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 256
+                },
+                "visibilityStateOffset": { "$ref": "#/$defs/offset" },
+                "visibilityMask": { "$ref": "#/$defs/mask" },
+                "readinessOffset": { "$ref": "#/$defs/offset" },
+                "readinessMask": { "$ref": "#/$defs/mask" },
+                "atkValuesPointerOffset": { "$ref": "#/$defs/offset" },
+                "atkValuesCountOffset": { "$ref": "#/$defs/offset" }
+              }
+            },
+            "atkValue": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "size",
+                "typeOffset",
+                "valueOffset",
+                "allowedStringTypes"
+              ],
+              "properties": {
+                "size": { "type": "integer", "minimum": 1, "maximum": 256 },
+                "typeOffset": { "$ref": "#/$defs/offset" },
+                "valueOffset": { "$ref": "#/$defs/offset" },
+                "allowedStringTypes": { "const": [40] }
+              }
+            },
+            "addonName": { "const": "Talk" },
+            "textValueIndex": { "const": 0 },
+            "nameValueIndex": { "const": 1 }
           }
         }
       }
@@ -104,10 +223,19 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["status", "gameVersion", "executableSha256", "verifierCommit"],
+          "required": [
+            "status",
+            "gameVersion",
+            "executableSha256",
+            "verifierCommit"
+          ],
           "properties": {
             "status": { "const": "live-verified" },
-            "gameVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "gameVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
             "executableSha256": { "$ref": "#/$defs/sha256" },
             "verifierCommit": { "$ref": "#/$defs/gitSha" }
           }
@@ -118,16 +246,29 @@
   "$defs": {
     "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "semver": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$" },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
     "offset": { "type": "integer", "minimum": 0, "maximum": 16777216 },
-    "pattern": { "type": "string", "minLength": 2, "maxLength": 1024, "pattern": "^(?:[0-9A-F]{2}|\\?\\?)+$" },
+    "mask": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+    "pattern": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 1024,
+      "pattern": "^(?:[0-9A-F]{2}|\\?\\?)+$"
+    },
     "root": {
       "type": "object",
       "additionalProperties": false,
       "required": ["pattern", "relativeFollowOffset", "isPointer"],
       "properties": {
         "pattern": { "$ref": "#/$defs/pattern" },
-        "relativeFollowOffset": { "type": "integer", "minimum": 0, "maximum": 512 },
+        "relativeFollowOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 512
+        },
         "isPointer": { "const": true }
       }
     }

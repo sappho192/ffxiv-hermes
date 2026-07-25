@@ -1,0 +1,65 @@
+name: Hermes v2 CI
+
+on:
+  pull_request:
+    paths:
+      - ".gitattributes"
+      - ".github/workflows/hermes-v2-ci.yml"
+      - "schemas/**"
+      - "tests/Hermes.V2.Generator.*/**"
+      - "tools/Hermes.V2.Generator/**"
+      - "v2/**"
+  push:
+    branches: ["main"]
+    paths:
+      - ".gitattributes"
+      - ".github/workflows/hermes-v2-ci.yml"
+      - "schemas/**"
+      - "tests/Hermes.V2.Generator.*/**"
+      - "tools/Hermes.V2.Generator/**"
+      - "v2/**"
+
+permissions:
+  contents: read
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Hermes
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Test generator
+        run: dotnet test tests/Hermes.V2.Generator.Tests/Hermes.V2.Generator.Tests.csproj -c Release
+
+      - name: Verify canonical JSON checkout bytes
+        shell: pwsh
+        run: |
+          $paths = @(git ls-files "v2/**/*.json" "schemas/*.json")
+          if ($paths.Count -eq 0) {
+            throw "No canonical JSON files were found."
+          }
+
+          foreach ($path in $paths) {
+            $blobHash = (git rev-parse "HEAD:$path").Trim()
+            $workingHash = (git hash-object --no-filters -- "$path").Trim()
+            if ($blobHash -ne $workingHash) {
+              throw "Working-copy bytes differ from the Git blob: $path"
+            }
+
+            $bytes = [System.IO.File]::ReadAllBytes((Join-Path $env:GITHUB_WORKSPACE $path))
+            if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+              throw "UTF-8 BOM is forbidden: $path"
+            }
+            if ($bytes -contains 0x0D) {
+              throw "CR bytes are forbidden: $path"
+            }
+            if ($bytes.Length -eq 0 -or $bytes[-1] -ne 0x0A -or ($bytes.Length -ge 2 -and $bytes[-2] -eq 0x0A)) {
+              throw "Exactly one LF-terminated text file is required: $path"
+            }
+          }
