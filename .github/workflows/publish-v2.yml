@@ -203,8 +203,17 @@ jobs:
           set -euo pipefail
           revision="$(cat publish-v2/revision.txt)"
           base="${V2_PUBLIC_BASE_URL%/}"
+          curl_args=(
+            --ipv4
+            --fail
+            --silent
+            --show-error
+            --max-time 15
+            --header "Accept: application/json"
+            --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/127.0.0.0 Safari/537.36"
+          )
           for attempt in {1..13}; do
-            if curl --fail --silent --show-error --max-time 15 "$base/latest.json" -o publish-v2/public-latest.json \
+            if curl "${curl_args[@]}" "$base/latest.json?revision=${revision#sha256:}" -o publish-v2/public-latest.json \
               && [[ "$(jq -r '.resourceRevision' publish-v2/public-latest.json)" == "$revision" ]]; then
               break
             fi
@@ -215,8 +224,8 @@ jobs:
             sleep 10
           done
           curl --retry 12 --retry-all-errors --retry-delay 10 \
-            --fail --silent --show-error --max-time 15 \
-            "$base/manifests/$revision.json" -o publish-v2/public-manifest.json
+            "${curl_args[@]}" \
+            "$base/manifests/$revision.json?revision=${revision#sha256:}" -o publish-v2/public-manifest.json
           test "$(dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- revision --manifest publish-v2/public-manifest.json)" = "$revision"
 
       - name: Record production state in git
