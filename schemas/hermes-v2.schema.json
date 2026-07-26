@@ -209,6 +209,54 @@
             "textValueIndex": { "const": 0 },
             "nameValueIndex": { "const": 1 }
           }
+        },
+        "battleTalk": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root",
+            "semantics",
+            "uiModuleOffset",
+            "raptureAtkModuleOffset",
+            "raptureAtkUnitManagerOffset",
+            "allLoadedUnitsListOffset",
+            "atkUnitList",
+            "addon",
+            "addonName",
+            "atkArrayDataHolderOffset",
+            "arrayDataHolder",
+            "arrayData",
+            "numberValuesOffset",
+            "stringValuesOffset",
+            "numberArrayId",
+            "stringArrayId",
+            "visibleIndex",
+            "nameIndex",
+            "textIndex",
+            "sequenceSemantics"
+          ],
+          "properties": {
+            "root": { "const": "framework" },
+            "semantics": { "const": "currentBattleTalk" },
+            "uiModuleOffset": { "$ref": "#/$defs/offset" },
+            "raptureAtkModuleOffset": { "$ref": "#/$defs/offset" },
+            "raptureAtkUnitManagerOffset": { "$ref": "#/$defs/offset" },
+            "allLoadedUnitsListOffset": { "$ref": "#/$defs/offset" },
+            "atkUnitList": { "$ref": "#/$defs/atkUnitList" },
+            "addon": { "$ref": "#/$defs/addonVisibility" },
+            "addonName": { "const": "_BattleTalk" },
+            "atkArrayDataHolderOffset": { "$ref": "#/$defs/offset" },
+            "arrayDataHolder": { "$ref": "#/$defs/atkArrayDataHolder" },
+            "arrayData": { "$ref": "#/$defs/atkArrayData" },
+            "numberValuesOffset": { "$ref": "#/$defs/offset" },
+            "stringValuesOffset": { "$ref": "#/$defs/offset" },
+            "numberArrayId": { "const": 38 },
+            "stringArrayId": { "const": 35 },
+            "visibleIndex": { "const": 0 },
+            "nameIndex": { "const": 0 },
+            "textIndex": { "const": 1 },
+            "sequenceSemantics": { "const": "visibilityOrContentGeneration" }
+          }
         }
       }
     },
@@ -252,6 +300,72 @@
     },
     "offset": { "type": "integer", "minimum": 0, "maximum": 16777216 },
     "mask": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+    "atkUnitList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entriesOffset", "countOffset", "capacity", "entrySize"],
+      "properties": {
+        "entriesOffset": { "$ref": "#/$defs/offset" },
+        "countOffset": { "$ref": "#/$defs/offset" },
+        "capacity": { "type": "integer", "minimum": 1, "maximum": 4096 },
+        "entrySize": { "const": 8 }
+      }
+    },
+    "addonVisibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nameOffset",
+        "nameCapacity",
+        "visibilityStateOffset",
+        "visibilityMask",
+        "readinessOffset",
+        "readinessMask"
+      ],
+      "properties": {
+        "nameOffset": { "$ref": "#/$defs/offset" },
+        "nameCapacity": { "type": "integer", "minimum": 1, "maximum": 256 },
+        "visibilityStateOffset": { "$ref": "#/$defs/offset" },
+        "visibilityMask": { "$ref": "#/$defs/mask" },
+        "readinessOffset": { "$ref": "#/$defs/offset" },
+        "readinessMask": { "$ref": "#/$defs/mask" }
+      }
+    },
+    "utf8String": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stringPointerOffset", "bufferUsedOffset", "lengthSource"],
+      "properties": {
+        "stringPointerOffset": { "$ref": "#/$defs/offset" },
+        "bufferUsedOffset": { "$ref": "#/$defs/offset" },
+        "lengthSource": { "const": "bufferUsedMinusNull" }
+      }
+    },
+    "atkArrayDataHolder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "numberArrayCountOffset",
+        "numberArraysOffset",
+        "stringArrayCountOffset",
+        "stringArraysOffset"
+      ],
+      "properties": {
+        "numberArrayCountOffset": { "$ref": "#/$defs/offset" },
+        "numberArraysOffset": { "$ref": "#/$defs/offset" },
+        "stringArrayCountOffset": { "$ref": "#/$defs/offset" },
+        "stringArraysOffset": { "$ref": "#/$defs/offset" }
+      }
+    },
+    "atkArrayData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sizeOffset", "updateStateOffset"],
+      "properties": {
+        "sizeOffset": { "$ref": "#/$defs/offset" },
+        "updateStateOffset": { "$ref": "#/$defs/offset" }
+      }
+    },
     "pattern": {
       "type": "string",
       "minLength": 2,

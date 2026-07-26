@@ -35,7 +35,9 @@ internal sealed record FrameworkRoot(
 internal sealed record Resources(
     [property: JsonPropertyOrder(0)] ChatLogResource ChatLog,
     [property: JsonPropertyOrder(1)] TalkResource Talk,
-    [property: JsonPropertyOrder(2)] CurrentTalkResource CurrentTalk);
+    [property: JsonPropertyOrder(2)] CurrentTalkResource CurrentTalk,
+    [property: JsonPropertyOrder(3), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    BattleTalkResource? BattleTalk = null);
 
 internal sealed record ChatLogResource(
     [property: JsonPropertyOrder(0)] string Root,
@@ -71,6 +73,28 @@ internal sealed record CurrentTalkResource(
     [property: JsonPropertyOrder(10)] int TextValueIndex,
     [property: JsonPropertyOrder(11)] int NameValueIndex);
 
+internal sealed record BattleTalkResource(
+    [property: JsonPropertyOrder(0)] string Root,
+    [property: JsonPropertyOrder(1)] string Semantics,
+    [property: JsonPropertyOrder(2)] int UiModuleOffset,
+    [property: JsonPropertyOrder(3)] int RaptureAtkModuleOffset,
+    [property: JsonPropertyOrder(4)] int RaptureAtkUnitManagerOffset,
+    [property: JsonPropertyOrder(5)] int AllLoadedUnitsListOffset,
+    [property: JsonPropertyOrder(6)] AtkUnitListLayout AtkUnitList,
+    [property: JsonPropertyOrder(7)] AddonVisibilityLayout Addon,
+    [property: JsonPropertyOrder(8)] string AddonName,
+    [property: JsonPropertyOrder(9)] int AtkArrayDataHolderOffset,
+    [property: JsonPropertyOrder(10)] AtkArrayDataHolderLayout ArrayDataHolder,
+    [property: JsonPropertyOrder(11)] AtkArrayDataLayout ArrayData,
+    [property: JsonPropertyOrder(12)] int NumberValuesOffset,
+    [property: JsonPropertyOrder(13)] int StringValuesOffset,
+    [property: JsonPropertyOrder(14)] int NumberArrayId,
+    [property: JsonPropertyOrder(15)] int StringArrayId,
+    [property: JsonPropertyOrder(16)] int VisibleIndex,
+    [property: JsonPropertyOrder(17)] int NameIndex,
+    [property: JsonPropertyOrder(18)] int TextIndex,
+    [property: JsonPropertyOrder(19)] string SequenceSemantics);
+
 internal sealed record AtkUnitListLayout(
     [property: JsonPropertyOrder(0)] int EntriesOffset,
     [property: JsonPropertyOrder(1)] int CountOffset,
@@ -86,6 +110,24 @@ internal sealed record AtkUnitBaseLayout(
     [property: JsonPropertyOrder(5)] uint ReadinessMask,
     [property: JsonPropertyOrder(6)] int AtkValuesPointerOffset,
     [property: JsonPropertyOrder(7)] int AtkValuesCountOffset);
+
+internal sealed record AddonVisibilityLayout(
+    [property: JsonPropertyOrder(0)] int NameOffset,
+    [property: JsonPropertyOrder(1)] int NameCapacity,
+    [property: JsonPropertyOrder(2)] int VisibilityStateOffset,
+    [property: JsonPropertyOrder(3)] uint VisibilityMask,
+    [property: JsonPropertyOrder(4)] int ReadinessOffset,
+    [property: JsonPropertyOrder(5)] uint ReadinessMask);
+
+internal sealed record AtkArrayDataHolderLayout(
+    [property: JsonPropertyOrder(0)] int NumberArrayCountOffset,
+    [property: JsonPropertyOrder(1)] int NumberArraysOffset,
+    [property: JsonPropertyOrder(2)] int StringArrayCountOffset,
+    [property: JsonPropertyOrder(3)] int StringArraysOffset);
+
+internal sealed record AtkArrayDataLayout(
+    [property: JsonPropertyOrder(0)] int SizeOffset,
+    [property: JsonPropertyOrder(1)] int UpdateStateOffset);
 
 internal sealed record AtkValueLayout(
     [property: JsonPropertyOrder(0)] int Size,

@@ -16,6 +16,17 @@ internal static partial class FcsMetadataExtractor {
     private const string AtkUnitListType = "FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitList";
     private const string AtkUnitBaseType = "FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase";
     private const string AtkValueType = "FFXIVClientStructs.FFXIV.Component.GUI.AtkValue";
+    private const string AtkModuleType = "FFXIVClientStructs.FFXIV.Component.GUI.AtkModule";
+    private const string AtkArrayDataHolderType = "FFXIVClientStructs.FFXIV.Component.GUI.AtkArrayDataHolder";
+    private const string AtkArrayDataType = "FFXIVClientStructs.FFXIV.Component.GUI.AtkArrayData";
+    private const string NumberArrayDataType = "FFXIVClientStructs.FFXIV.Component.GUI.NumberArrayData";
+    private const string StringArrayDataType = "FFXIVClientStructs.FFXIV.Component.GUI.StringArrayData";
+    private const string NumberArrayType = "FFXIVClientStructs.FFXIV.Component.GUI.NumberArrayType";
+    private const string StringArrayType = "FFXIVClientStructs.FFXIV.Component.GUI.StringArrayType";
+    private const string AgentModuleType = "FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentModule";
+    private const string AgentHudType = "FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentHUD";
+    private const string AgentIdType = "FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentId";
+    private const string HudQueuedBattleTalkType = "FFXIVClientStructs.FFXIV.Client.UI.Agent.HudQueuedBattleTalk";
     private const string StaticAddressAttributeType = "InteropGenerator.Runtime.Attributes.StaticAddressAttribute";
     private const string BitFieldAttributeType = "InteropGenerator.Runtime.Attributes.BitFieldAttribute`1";
 
@@ -120,6 +131,74 @@ internal static partial class FcsMetadataExtractor {
             GetFieldOffset(atkValueType),
             GetFieldOffset(atkValue, "String"),
             managedStringType);
+    }
+
+    internal static BattleTalkProbeMetadata ExtractBattleTalkProbe(Assembly assembly) {
+        Type raptureAtkModule = RequiredType(assembly, RaptureAtkModuleType);
+        Type atkModule = RequiredType(assembly, AtkModuleType);
+        Type holder = RequiredType(assembly, AtkArrayDataHolderType);
+        Type arrayData = RequiredType(assembly, AtkArrayDataType);
+        Type numberArrayData = RequiredType(assembly, NumberArrayDataType);
+        Type stringArrayData = RequiredType(assembly, StringArrayDataType);
+        Type numberArrayType = RequiredType(assembly, NumberArrayType);
+        Type stringArrayType = RequiredType(assembly, StringArrayType);
+        Type agentModule = RequiredType(assembly, AgentModuleType);
+        Type agentHud = RequiredType(assembly, AgentHudType);
+        Type agentId = RequiredType(assembly, AgentIdType);
+        Type queuedBattleTalk = RequiredType(assembly, HudQueuedBattleTalkType);
+
+        FieldInfo agents = RequiredField(agentModule, "_agents");
+        FieldInfo queue = RequiredField(agentHud, "_queuedBattleTalks");
+        return new BattleTalkProbeMetadata(
+            GetFieldOffset(atkModule, "AtkArrayDataHolder"),
+            GetFieldOffset(holder, "NumberArrayCount"),
+            GetFieldOffset(holder, "NumberArrays"),
+            GetFieldOffset(holder, "StringArrayCount"),
+            GetFieldOffset(holder, "StringArrays"),
+            GetFieldOffset(arrayData, "Size"),
+            GetFieldOffset(arrayData, "UpdateState"),
+            GetFieldOffset(numberArrayData, "IntArray"),
+            GetFieldOffset(stringArrayData, "StringArray"),
+            GetFieldOffset(stringArrayData, "ManagedStringArray"),
+            Convert.ToInt32(Enum.Parse(numberArrayType, "BattleTalk")),
+            Convert.ToInt32(Enum.Parse(stringArrayType, "BattleTalk")),
+            GetFieldOffset(raptureAtkModule, "AgentModule"),
+            GetFieldOffset(agents),
+            GetFixedSizeArrayCapacity(agents.FieldType),
+            IntPtr.Size,
+            Convert.ToInt32(Enum.Parse(agentId, "Hud")),
+            GetFieldOffset(queue),
+            GetFixedSizeArrayCapacity(queue.FieldType),
+            GetStructSize(queuedBattleTalk),
+            GetFieldOffset(queuedBattleTalk, "IsPending"),
+            GetFieldOffset(queuedBattleTalk, "Style"),
+            GetFieldOffset(queuedBattleTalk, "Name"),
+            GetFieldOffset(queuedBattleTalk, "Text"),
+            GetFieldOffset(queuedBattleTalk, "Image"),
+            GetFieldOffset(queuedBattleTalk, "Sound"),
+            GetFieldOffset(queuedBattleTalk, "EntityId"));
+    }
+
+    internal static BattleTalkProbeMetadata ExtractBattleTalkProbe(string assemblyPath) {
+        string fullPath = Path.GetFullPath(assemblyPath);
+        if (!File.Exists(fullPath)) {
+            throw new FileNotFoundException("The FCS assembly was not found. Build FFXIVClientStructs first.", fullPath);
+        }
+
+        string assemblyDirectory = Path.GetDirectoryName(fullPath)!;
+        AssemblyLoadContext.Default.Resolving += ResolveDependency;
+        try {
+            Assembly assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(fullPath);
+            return ExtractBattleTalkProbe(assembly);
+        }
+        finally {
+            AssemblyLoadContext.Default.Resolving -= ResolveDependency;
+        }
+
+        Assembly? ResolveDependency(AssemblyLoadContext context, AssemblyName name) {
+            string dependency = Path.Combine(assemblyDirectory, name.Name + ".dll");
+            return File.Exists(dependency) ? context.LoadFromAssemblyPath(dependency) : null;
+        }
     }
 
     internal static string NormalizePattern(string value) {

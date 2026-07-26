@@ -90,6 +90,59 @@ internal static partial class ManifestValidator {
         if (textIndex < 0 || nameIndex < 0 || textIndex == nameIndex) {
             throw new InvalidOperationException("CurrentTalk text and name AtkValue indexes must be distinct and non-negative.");
         }
+
+        JsonNode? battleTalk = root["resources"]!["battleTalk"];
+        if (battleTalk != null) {
+            if (root["compatibility"]!["minimumSharlayanVersion"]!.GetValue<string>() != "9.2.0") {
+                throw new InvalidOperationException("BattleTalk manifests must require Sharlayan 9.2.0.");
+            }
+
+            string[] sharedOffsets = [
+                "uiModuleOffset",
+                "raptureAtkModuleOffset",
+                "raptureAtkUnitManagerOffset",
+                "allLoadedUnitsListOffset",
+            ];
+            foreach (string property in sharedOffsets) {
+                if (battleTalk[property]!.GetValue<int>() != current[property]!.GetValue<int>()) {
+                    throw new InvalidOperationException($"BattleTalk and CurrentTalk must share {property}.");
+                }
+            }
+
+            if (!JsonNode.DeepEquals(battleTalk["atkUnitList"], current["atkUnitList"])) {
+                throw new InvalidOperationException("BattleTalk and CurrentTalk must share the AtkUnitList layout.");
+            }
+
+            JsonNode battleAddon = battleTalk["addon"]!;
+            string[] sharedAddonOffsets = [
+                "nameOffset",
+                "nameCapacity",
+                "visibilityStateOffset",
+                "visibilityMask",
+                "readinessOffset",
+                "readinessMask",
+            ];
+            foreach (string property in sharedAddonOffsets) {
+                if (battleAddon[property]!.ToJsonString() != addon[property]!.ToJsonString()) {
+                    throw new InvalidOperationException($"BattleTalk and CurrentTalk must share addon {property}.");
+                }
+            }
+
+            JsonNode holder = battleTalk["arrayDataHolder"]!;
+            int numberArraysOffset = holder["numberArraysOffset"]!.GetValue<int>();
+            int stringArraysOffset = holder["stringArraysOffset"]!.GetValue<int>();
+            int numberValuesOffset = battleTalk["numberValuesOffset"]!.GetValue<int>();
+            int stringValuesOffset = battleTalk["stringValuesOffset"]!.GetValue<int>();
+            JsonNode arrayData = battleTalk["arrayData"]!;
+            if (numberArraysOffset % 8 != 0
+                || stringArraysOffset % 8 != 0
+                || numberValuesOffset % 8 != 0
+                || stringValuesOffset % 8 != 0
+                || arrayData["sizeOffset"]!.GetValue<int>() + sizeof(int)
+                    > arrayData["updateStateOffset"]!.GetValue<int>()) {
+                throw new InvalidOperationException("BattleTalk array headers and value pointers are inconsistent.");
+            }
+        }
     }
 
     [GeneratedRegex("^(?:[0-9A-F]{2}|\\?\\?)+$", RegexOptions.CultureInvariant)]
