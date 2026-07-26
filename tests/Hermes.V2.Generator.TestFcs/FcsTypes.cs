@@ -41,12 +41,54 @@ namespace FFXIVClientStructs.FFXIV.Client.UI {
 
     [StructLayout(LayoutKind.Explicit)]
     public struct RaptureAtkModule {
+        [FieldOffset(0)] public AtkModule AtkModule;
+        [FieldOffset(0x12400)] public Agent.AgentModule AgentModule;
         [FieldOffset(0x13420)] public RaptureAtkUnitManager RaptureAtkUnitManager;
     }
 
     [StructLayout(LayoutKind.Explicit)]
     public struct RaptureAtkUnitManager {
         [FieldOffset(0)] public AtkUnitManager AtkUnitManager;
+    }
+
+}
+
+namespace FFXIVClientStructs.FFXIV.Client.UI.Agent {
+    using FFXIVClientStructs.FFXIV.Client.System.String;
+
+    public enum AgentId : uint {
+        Hud = 4,
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 0xFE8)]
+    internal struct FixedSizeArray509Pointers {
+        [FieldOffset(0)] public nint First;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 0xE80)]
+    internal struct FixedSizeArray16HudQueuedBattleTalk {
+        [FieldOffset(0)] public HudQueuedBattleTalk First;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct AgentModule {
+        [FieldOffset(0x20)] internal FixedSizeArray509Pointers _agents;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct AgentHUD {
+        [FieldOffset(0x3650)] internal FixedSizeArray16HudQueuedBattleTalk _queuedBattleTalks;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 0xE8)]
+    public struct HudQueuedBattleTalk {
+        [FieldOffset(0)] public bool IsPending;
+        [FieldOffset(0x2)] public byte Style;
+        [FieldOffset(0x8)] public Utf8String Name;
+        [FieldOffset(0x70)] public Utf8String Text;
+        [FieldOffset(0xDC)] public uint Image;
+        [FieldOffset(0xE0)] public int Sound;
+        [FieldOffset(0xE4)] public uint EntityId;
     }
 }
 
@@ -94,6 +136,46 @@ namespace FFXIVClientStructs.FFXIV.Component.GUI {
     [StructLayout(LayoutKind.Explicit)]
     public struct AtkUnitManager {
         [FieldOffset(0x6900)] public AtkUnitList AllLoadedUnitsList;
+    }
+
+    public enum NumberArrayType {
+        BattleTalk = 38,
+    }
+
+    public enum StringArrayType {
+        BattleTalk = 35,
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct AtkModule {
+        [FieldOffset(0x1BA8)] public AtkArrayDataHolder AtkArrayDataHolder;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct AtkArrayDataHolder {
+        [FieldOffset(0)] public short NumberArrayCount;
+        [FieldOffset(0x2)] public short StringArrayCount;
+        [FieldOffset(0x18)] public nint NumberArrays;
+        [FieldOffset(0x30)] public nint StringArrays;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct AtkArrayData {
+        [FieldOffset(0x8)] public int Size;
+        [FieldOffset(0x1F)] public byte UpdateState;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct NumberArrayData {
+        [FieldOffset(0)] public AtkArrayData AtkArrayData;
+        [FieldOffset(0x28)] public nint IntArray;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct StringArrayData {
+        [FieldOffset(0)] public AtkArrayData AtkArrayData;
+        [FieldOffset(0x28)] public nint StringArray;
+        [FieldOffset(0x30)] public nint ManagedStringArray;
     }
 
     [StructLayout(LayoutKind.Explicit, Size = 0x810)]

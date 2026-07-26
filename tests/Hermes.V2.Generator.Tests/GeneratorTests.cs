@@ -45,6 +45,41 @@ public sealed class GeneratorTests {
         Assert.Equal(0x28, result.ManagedStringType);
     }
 
+    [Fact]
+    public void ExtractsBattleTalkProbeMetadata() {
+        Assembly fixture = typeof(FFXIVClientStructs.FFXIV.Client.System.Framework.Framework).Assembly;
+
+        BattleTalkProbeMetadata result = FcsMetadataExtractor.ExtractBattleTalkProbe(fixture);
+
+        Assert.Equal(0x1BA8, result.AtkArrayDataHolderOffset);
+        Assert.Equal(0, result.NumberArrayCountOffset);
+        Assert.Equal(0x18, result.NumberArraysOffset);
+        Assert.Equal(0x2, result.StringArrayCountOffset);
+        Assert.Equal(0x30, result.StringArraysOffset);
+        Assert.Equal(0x8, result.ArraySizeOffset);
+        Assert.Equal(0x1F, result.ArrayUpdateStateOffset);
+        Assert.Equal(0x28, result.NumberValuesOffset);
+        Assert.Equal(0x28, result.StringValuesOffset);
+        Assert.Equal(0x30, result.ManagedStringValuesOffset);
+        Assert.Equal(38, result.BattleTalkNumberArrayId);
+        Assert.Equal(35, result.BattleTalkStringArrayId);
+        Assert.Equal(0x12400, result.AgentModuleOffset);
+        Assert.Equal(0x20, result.AgentsOffset);
+        Assert.Equal(509, result.AgentsCapacity);
+        Assert.Equal(8, result.AgentEntrySize);
+        Assert.Equal(4, result.HudAgentId);
+        Assert.Equal(0x3650, result.QueueOffset);
+        Assert.Equal(16, result.QueueCapacity);
+        Assert.Equal(0xE8, result.QueueEntrySize);
+        Assert.Equal(0, result.IsPendingOffset);
+        Assert.Equal(0x2, result.StyleOffset);
+        Assert.Equal(0x8, result.NameOffset);
+        Assert.Equal(0x70, result.TextOffset);
+        Assert.Equal(0xDC, result.ImageOffset);
+        Assert.Equal(0xE0, result.SoundOffset);
+        Assert.Equal(0xE4, result.EntityIdOffset);
+    }
+
     [Theory]
     [InlineData("48 8b-1d ??", "488B1D??")]
     [InlineData("488B1D????????", "488B1D????????")]
@@ -94,6 +129,46 @@ public sealed class GeneratorTests {
         node["resources"]!["talk"]!["utf8String"]!["stringLengthOffset"] = 0x18;
 
         Assert.Throws<InvalidOperationException>(() => ManifestValidator.Validate(Encoding.UTF8.GetBytes(node.ToJsonString()), schema));
+    }
+
+    [Fact]
+    public void OptionalBattleTalkPassesAndRejectsInvalidArraySemantics() {
+        string root = FindRepositoryRoot();
+        string schema = Path.Combine(root, "schemas", "hermes-v2.schema.json");
+        HermesManifest baseline = CreateManifest();
+        BattleTalkResource resource = new(
+            "framework",
+            "currentBattleTalk",
+            0x2B68,
+            0xD2670,
+            0x13420,
+            0x6900,
+            new AtkUnitListLayout(0x8, 0x808, 256, 8),
+            new AddonVisibilityLayout(0x8, 32, 0x198, 0x00200000, 0x1A1, 0x01),
+            "_BattleTalk",
+            0x1BA8,
+            new AtkArrayDataHolderLayout(0, 0x18, 0x2, 0x30),
+            new AtkArrayDataLayout(0x8, 0x1F),
+            0x28,
+            0x28,
+            38,
+            35,
+            0,
+            0,
+            1,
+            "visibilityOrContentGeneration");
+        HermesManifest manifest = baseline with {
+            Compatibility = new Compatibility("9.2.0", 1),
+            Resources = baseline.Resources with { BattleTalk = resource },
+        };
+
+        byte[] bytes = CanonicalJson.Serialize(manifest);
+        ManifestValidator.Validate(bytes, schema);
+
+        JsonNode invalid = JsonNode.Parse(bytes)!;
+        invalid["resources"]!["battleTalk"]!["textIndex"] = 0;
+        Assert.Throws<InvalidOperationException>(
+            () => ManifestValidator.Validate(Encoding.UTF8.GetBytes(invalid.ToJsonString()), schema));
     }
 
     [Fact]

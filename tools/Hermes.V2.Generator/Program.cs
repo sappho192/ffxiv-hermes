@@ -10,12 +10,13 @@ internal static partial class Program {
     private static int Main(string[] args) {
         try {
             if (args.Length == 0) {
-                throw new ArgumentException("Expected command: generate, validate, or revision.");
+                throw new ArgumentException("Expected command: generate, probe-layout, validate, or revision.");
             }
 
             Dictionary<string, string> options = ParseOptions(args.Skip(1));
             return args[0] switch {
                 "generate" => Generate(options),
+                "probe-layout" => ProbeLayout(options),
                 "validate" => Validate(options),
                 "revision" => Revision(options),
                 _ => throw new ArgumentException($"Unknown command: {args[0]}")
@@ -25,6 +26,86 @@ internal static partial class Program {
             Console.Error.WriteLine($"error: {exception.Message}");
             return 1;
         }
+    }
+
+    private static int ProbeLayout(IReadOnlyDictionary<string, string> options) {
+        string fcsDirectory = FullPath(Required(options, "fcs-directory"));
+        string fcsCommit = RequiredSha(options, "fcs-commit");
+        string outputPath = FullPath(Required(options, "output"));
+        string assemblyPath = FullPath(options.GetValueOrDefault(
+            "fcs-assembly",
+            Path.Combine(fcsDirectory, "bin", "Release", "FFXIVClientStructs.dll")));
+
+        string checkoutCommit = Git(fcsDirectory, "rev-parse", "HEAD");
+        if (!string.Equals(fcsCommit, checkoutCommit, StringComparison.Ordinal)) {
+            throw new InvalidOperationException($"FCS checkout is {checkoutCommit}, expected {fcsCommit}.");
+        }
+
+        ExtractedMetadata common = FcsMetadataExtractor.Extract(assemblyPath);
+        BattleTalkProbeMetadata probe = FcsMetadataExtractor.ExtractBattleTalkProbe(assemblyPath);
+        BattleTalkProbeLayout layout = new(
+            1,
+            fcsCommit,
+            new BattleTalkProbeUiLayout(common.UiModuleOffset, common.RaptureAtkModuleOffset),
+            new BattleTalkProbeAddonLayout(
+                common.RaptureAtkUnitManagerOffset,
+                common.AllLoadedUnitsListOffset,
+                new AtkUnitListLayout(
+                    common.AtkUnitListEntriesOffset,
+                    common.AtkUnitListCountOffset,
+                    common.AtkUnitListCapacity,
+                    common.AtkUnitListEntrySize),
+                new AtkUnitBaseLayout(
+                    common.AddonNameOffset,
+                    common.AddonNameCapacity,
+                    common.AddonVisibilityStateOffset,
+                    common.AddonVisibilityMask,
+                    common.AddonReadinessOffset,
+                    common.AddonReadinessMask,
+                    common.AtkValuesPointerOffset,
+                    common.AtkValuesCountOffset),
+                new AtkValueLayout(
+                    common.AtkValueSize,
+                    common.AtkValueTypeOffset,
+                    common.AtkValueValueOffset,
+                    [common.ManagedStringType]),
+                "_BattleTalk"),
+            new BattleTalkProbeArrayLayout(
+                probe.AtkArrayDataHolderOffset,
+                probe.NumberArrayCountOffset,
+                probe.NumberArraysOffset,
+                probe.StringArrayCountOffset,
+                probe.StringArraysOffset,
+                probe.ArraySizeOffset,
+                probe.ArrayUpdateStateOffset,
+                probe.NumberValuesOffset,
+                probe.StringValuesOffset,
+                probe.ManagedStringValuesOffset,
+                probe.BattleTalkNumberArrayId,
+                probe.BattleTalkStringArrayId),
+            new BattleTalkProbeAgentHudLayout(
+                probe.AgentModuleOffset,
+                probe.AgentsOffset,
+                probe.AgentsCapacity,
+                probe.AgentEntrySize,
+                probe.HudAgentId,
+                probe.QueueOffset,
+                probe.QueueCapacity,
+                probe.QueueEntrySize,
+                probe.IsPendingOffset,
+                probe.StyleOffset,
+                probe.NameOffset,
+                probe.TextOffset,
+                probe.ImageOffset,
+                probe.SoundOffset,
+                probe.EntityIdOffset),
+            new Utf8StringLayout(common.StringPointerOffset, common.BufferUsedOffset, "bufferUsedMinusNull"));
+
+        byte[] bytes = CanonicalJson.Serialize(layout);
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        File.WriteAllBytes(outputPath, bytes);
+        Console.WriteLine(CanonicalJson.Revision(bytes));
+        return 0;
     }
 
     private static int Generate(IReadOnlyDictionary<string, string> options) {
@@ -49,10 +130,17 @@ internal static partial class Program {
         }
 
         ExtractedMetadata metadata = FcsMetadataExtractor.Extract(assemblyPath);
+        BattleTalkProbeMetadata dialogue = FcsMetadataExtractor.ExtractBattleTalkProbe(assemblyPath);
+        string minimumSharlayanVersion = Required(options, "minimum-sharlayan-version");
+        if (minimumSharlayanVersion != "9.2.0") {
+            throw new InvalidOperationException(
+                "BattleTalk manifests require minimum Sharlayan version 9.2.0.");
+        }
+
         Validation validation = CreateValidation(options);
         HermesManifest manifest = new(
             2,
-            new Compatibility(Required(options, "minimum-sharlayan-version"), 1),
+            new Compatibility(minimumSharlayanVersion, 1),
             new Source(FcsRepository, fcsCommit, GeneratorRepository, generatorCommit),
             new Platform("ffxiv_dx11.exe", "x64"),
             new Roots(new FrameworkRoot(metadata.Pattern, metadata.RelativeFollowOffset, metadata.IsPointer)),
@@ -93,7 +181,44 @@ internal static partial class Program {
                         [metadata.ManagedStringType]),
                     "Talk",
                     0,
-                    1)),
+                    1),
+                new BattleTalkResource(
+                    "framework",
+                    "currentBattleTalk",
+                    metadata.UiModuleOffset,
+                    metadata.RaptureAtkModuleOffset,
+                    metadata.RaptureAtkUnitManagerOffset,
+                    metadata.AllLoadedUnitsListOffset,
+                    new AtkUnitListLayout(
+                        metadata.AtkUnitListEntriesOffset,
+                        metadata.AtkUnitListCountOffset,
+                        metadata.AtkUnitListCapacity,
+                        metadata.AtkUnitListEntrySize),
+                    new AddonVisibilityLayout(
+                        metadata.AddonNameOffset,
+                        metadata.AddonNameCapacity,
+                        metadata.AddonVisibilityStateOffset,
+                        metadata.AddonVisibilityMask,
+                        metadata.AddonReadinessOffset,
+                        metadata.AddonReadinessMask),
+                    "_BattleTalk",
+                    dialogue.AtkArrayDataHolderOffset,
+                    new AtkArrayDataHolderLayout(
+                        dialogue.NumberArrayCountOffset,
+                        dialogue.NumberArraysOffset,
+                        dialogue.StringArrayCountOffset,
+                        dialogue.StringArraysOffset),
+                    new AtkArrayDataLayout(
+                        dialogue.ArraySizeOffset,
+                        dialogue.ArrayUpdateStateOffset),
+                    dialogue.NumberValuesOffset,
+                    dialogue.StringValuesOffset,
+                    dialogue.BattleTalkNumberArrayId,
+                    dialogue.BattleTalkStringArrayId,
+                    0,
+                    0,
+                    1,
+                    "visibilityOrContentGeneration")),
             validation);
 
         byte[] bytes = CanonicalJson.Serialize(manifest);

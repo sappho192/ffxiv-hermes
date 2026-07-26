@@ -4,6 +4,16 @@ on:
   schedule:
     - cron: "0 */6 * * *"
   workflow_dispatch:
+    inputs:
+      fcs_commit:
+        description: Exact 40-character FCS commit (defaults to current main)
+        required: false
+        type: string
+      force_regenerate:
+        description: Regenerate even when this FCS commit was already processed
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: fcs-v2-candidate
@@ -30,13 +40,20 @@ jobs:
       - name: Resolve FCS main once
         id: fcs
         shell: bash
+        env:
+          REQUESTED_FCS_COMMIT: ${{ inputs.fcs_commit }}
+          FORCE_REGENERATE: ${{ inputs.force_regenerate }}
         run: |
           set -euo pipefail
-          commit="$(git ls-remote https://github.com/aers/FFXIVClientStructs.git refs/heads/main | cut -f1)"
+          commit="$REQUESTED_FCS_COMMIT"
+          if [[ -z "$commit" ]]; then
+            commit="$(git ls-remote https://github.com/aers/FFXIVClientStructs.git refs/heads/main | cut -f1)"
+          fi
           [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid FCS commit: $commit" >&2; exit 1; }
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
           candidate="v2/candidates/$commit.json"
-          if jq -e --arg commit "$commit" '.fcsCommit == $commit' v2/source/fcs-head.json >/dev/null \
+          if [[ "$FORCE_REGENERATE" != "true" ]] \
+            && jq -e --arg commit "$commit" '.fcsCommit == $commit' v2/source/fcs-head.json >/dev/null \
             && { [[ -f v2/latest.json ]] || [[ -f "$candidate" ]]; }; then
             echo "already_processed=true" >> "$GITHUB_OUTPUT"
           else
@@ -82,7 +99,7 @@ jobs:
             --fcs-directory "$GITHUB_WORKSPACE/external/FFXIVClientStructs"
             --fcs-commit "${{ steps.fcs.outputs.commit }}"
             --generator-commit "$GITHUB_SHA"
-            --minimum-sharlayan-version 9.1.2
+            --minimum-sharlayan-version 9.2.0
             --validation-status candidate
             --schema "$GITHUB_WORKSPACE/schemas/hermes-v2.schema.json"
             --diff-against "$previous"

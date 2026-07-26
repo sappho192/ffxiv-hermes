@@ -12,8 +12,8 @@ internal static class CanonicalJson {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    internal static byte[] Serialize(HermesManifest manifest) {
-        string json = JsonSerializer.Serialize(manifest, Options).Replace("\r\n", "\n", StringComparison.Ordinal);
+    internal static byte[] Serialize<T>(T value) {
+        string json = JsonSerializer.Serialize(value, Options).Replace("\r\n", "\n", StringComparison.Ordinal);
         return new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(json + "\n");
     }
 

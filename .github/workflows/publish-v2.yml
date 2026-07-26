@@ -117,7 +117,7 @@ jobs:
             --fcs-directory "$GITHUB_WORKSPACE/external/FFXIVClientStructs" \
             --fcs-commit "$FCS_COMMIT" \
             --generator-commit "$GITHUB_SHA" \
-            --minimum-sharlayan-version 9.1.2 \
+            --minimum-sharlayan-version 9.2.0 \
             --validation-status live-verified \
             --game-version "$GAME_VERSION" \
             --executable-sha256 "$EXECUTABLE_SHA256" \
