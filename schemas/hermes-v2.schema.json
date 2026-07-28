@@ -271,6 +271,12 @@
         {
           "type": "object",
           "additionalProperties": false,
+          "required": ["status"],
+          "properties": { "status": { "const": "generated" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
           "required": [
             "status",
             "gameVersion",

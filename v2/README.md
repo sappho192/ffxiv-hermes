@@ -1,14 +1,17 @@
 # Hermes v2 artifacts
 
-`manifests/<sha256-hex>.json` contains immutable, live-verified manifests in git. The
+`manifests/<sha256-hex>.json` contains immutable production manifests in git. New
+automatic publications use `validation.status=generated`; historic
+`live-verified` revisions remain valid. The
 revision is `sha256:<lowercase hex>` of the exact UTF-8 manifest bytes; a manifest
 does not contain its own revision. Canonical files use the generator's fixed property
 order, two-space indentation, LF newlines, no UTF-8 BOM, and exactly one trailing
 newline.
 
 `latest.json` is mutable and is published only after its immutable manifest has been
-uploaded and read back successfully. Candidate manifests belong in pull requests or
-workflow artifacts and must not be referenced by `latest.json`.
+uploaded and read back successfully. Generated evidence is retained as a workflow
+artifact. Historic candidate files are repository records and are never referenced
+by `latest.json`.
 
 The public R2 key retains the full revision (`v2/manifests/sha256:<hex>.json`). Git and
 local cache filenames use only `<hex>.json` because `:` is not a valid Windows filename
@@ -21,10 +24,10 @@ the mutable pointer is `latest.json` and immutable objects are
 Repository-only fixtures and FCS processing state are stored under `fixtures/` and
 `source/`; they are not public R2 objects.
 
-Generated pull requests keep unverified manifests and review summaries in
-`candidates/`. A candidate becomes deployable only when the protected publish
-workflow rebuilds it with `live-verified` metadata; candidate files are never
-uploaded to R2.
+The scheduled workflow generates twice, compares canonical bytes, runs schema and
+semantic validation, and publishes only when `{roots,resources}` changes. A
+`generated` manifest requires Sharlayan.Lite 9.2.1 or newer and contains no
+live-verification metadata.
 
 The first production manifest requires three runtime resources:
 

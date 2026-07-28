@@ -1,156 +1,91 @@
 ---
 name: verify-hermes-v2-production
-description: Promote a live-verified Hermes v2 candidate through the protected publish workflow and verify production end to end. Use after explicit authorization to dispatch publish-v2, monitor the workflow, verify immutable R2 and public bytes, confirm latest and Git production state, diagnose partial failures, or perform post-publication IronworksTranslator smoke checks.
+description: Verify Hermes v2 production after scheduled or manual generated publication, diagnose partial failures, or roll latest back to a recorded immutable revision. Use for workflow-run inspection, R2 and public byte checks, Git production-state comparison, rollback-previous or rollback-revision operations, and optional post-publication IronworksTranslator smoke checks.
 ---
 
 # Verify Hermes v2 Production
 
-Promote only a merged candidate that has passed the dedicated live-game skill. Treat workflow, storage, CDN, Git, and application checks as separate evidence layers.
+Treat workflow, R2, CDN, Git, and application behavior as separate evidence layers.
 
-## Require explicit authority
+## Inspect publication
 
-Publishing changes production state. Before dispatch:
+Use `--repo sappho192/ffxiv-hermes` on every `gh` command. Resolve the exact workflow run, head SHA,
+FCS SHA, target revision, and Git production-record commit.
 
-1. Require explicit user authorization to promote the exact FCS commit.
-2. Confirm the candidate is merged into current remote `main`.
-3. Confirm live smoke passed for CHATLOG, CurrentTalk, LastTalk, Talk policy, and BattleTalk as applicable.
-4. Confirm the user-approved `game_version`, `executable_sha256`, and `verifier_commit`.
-5. Do not infer authorization from a request to inspect, validate, prepare, or explain.
+For `.github/workflows/fcs-v2-publish.yml`, require:
 
-Use `--repo sappho192/ffxiv-hermes` on every `gh` command.
+1. exact FCS checkout and successful build;
+2. generator tests and byte-identical double generation;
+3. `generated` validation with minimum Sharlayan 9.2.1 and no live metadata;
+4. immutable upload/read-back before any latest update;
+5. Git target recorded before R2 latest replacement;
+6. public convergence checks pass with retries.
 
-## Validate promotion inputs
+Workflow success alone is not complete production proof.
+
+## Verify Git, R2, and public state
+
+Fetch current `origin/main` and resolve `v2/latest.json`, its Git manifest, and
+`v2/source/fcs-head.json`. Fetch public latest and immutable objects with retries.
 
 Require:
 
-- `fcs_commit`: lowercase 40-character SHA with `v2/candidates/<sha>.json` on remote `main`;
-- `game_version`: value from `ffxivgame.ver`, not `ffxiv_dx11.exe` PE version;
-- `executable_sha256`: lowercase 64-character SHA-256 of the tested executable;
-- `verifier_commit`: exact 40-character Sharlayan commit used for live smoke, present on a remote ref;
-- candidate revision independently validated from exact canonical bytes.
+- public latest bytes equal the Git latest blob;
+- public immutable bytes equal the Git manifest blob;
+- immutable SHA-256 equals the revision hex;
+- latest and manifest FCS commits agree;
+- validation is `generated` or historic `live-verified`;
+- generated manifests contain no live metadata and require Sharlayan 9.2.1 or newer;
+- immutable cache control is `public,max-age=31536000,immutable`;
+- latest cache control is `public,max-age=0,s-maxage=60,must-revalidate`.
 
-Fetch and inspect remote state without switching the user's branch:
+## Diagnose partial failures
 
-```powershell
-git fetch origin main
-git show origin/main:v2/candidates/<fcs-commit>.json
-git show origin/main:.github/workflows/publish-v2.yml
-```
+Inspect separately:
 
-The selected workflow revision must be current `main`.
+1. generated target and revision from workflow artifacts;
+2. immutable R2 object and read-back bytes;
+3. Git latest and manifest;
+4. direct R2 latest;
+5. public CDN latest and immutable bytes.
 
-## Dispatch the protected workflow
+Never overwrite an immutable revision with different bytes. A rerun of the scheduled workflow
+reconciles R2 latest to the Git-recorded target. Do not assume a failed CDN check means upload failed.
 
-After explicit authorization, run:
+## Roll back
+
+Rollback changes production state and requires explicit user authorization for the operation.
+
+Dispatch the current `main` workflow:
 
 ```powershell
 gh workflow run publish-v2.yml `
   --repo sappho192/ffxiv-hermes `
   --ref main `
-  -f mode=promote `
-  -f fcs_commit=<fcs-commit> `
-  -f game_version=<game-version> `
-  -f executable_sha256=<executable-sha256> `
-  -f verifier_commit=<verifier-commit>
+  -f mode=rollback-previous
 ```
 
-Resolve the newly created run by workflow, event, creation time, and head SHA. Do not accidentally monitor an older run.
-
-## Monitor every publish stage
-
-Inspect job steps and logs. Require:
-
-1. dispatch inputs validated;
-2. exact FCS commit fetched and built;
-3. generator tests passed;
-4. live-verified manifest rebuilt from current `main`;
-5. candidate and production `{roots,resources}` are structurally identical after normalized
-   comparison;
-6. final manifest schema and revision validated;
-7. immutable object uploaded with `If-None-Match` protection or accepted only when existing bytes are identical;
-8. R2 read-back bytes match the generated manifest;
-9. `v2/latest.json` replaced only after immutable read-back;
-10. public latest and immutable endpoint convergence checks passed with retries;
-11. Git production manifest, latest pointer, and source state recorded on `main`.
-
-Do not call a workflow success alone complete production proof.
-
-## Verify public and Git state independently
-
-Fetch the post-workflow `main` and resolve:
-
-- production record commit;
-- new resource revision;
-- `v2/latest.json`;
-- `v2/manifests/<revision-without-sha256-prefix>.json`;
-- `v2/source/fcs-head.json`.
-
-Fetch public objects with transient-error retries:
+Or select a recorded immutable revision:
 
 ```powershell
-curl.exe --fail --silent --show-error `
-  --dump-header - `
-  --retry 12 --retry-all-errors --retry-delay 10 `
-  https://hermes.sapphosound.com/v2/latest.json
+gh workflow run publish-v2.yml `
+  --repo sappho192/ffxiv-hermes `
+  --ref main `
+  -f mode=rollback-revision `
+  -f rollback_revision=sha256:<hex>
 ```
 
-Require:
+Require the target manifest to exist in Git and R2 with identical bytes. Confirm the workflow
+records the rollback latest in Git before replacing R2 latest. `v2/source/fcs-head.json` intentionally
+remains unchanged so the next schedule does not immediately republish the rolled-back FCS.
 
-- public latest selects the new revision and exact FCS commit;
-- public immutable URL uses the `sha256:` object key;
-- public immutable SHA-256 equals the revision hex;
-- public latest bytes equal the Git latest blob;
-- public immutable bytes equal the Git manifest blob;
-- manifest `validation.status` is `live-verified`;
-- game version, executable hash, and verifier commit equal approved inputs;
-- manifest runtime resources equal the candidate runtime resources;
-- immutable cache control is `public,max-age=31536000,immutable`;
-- latest cache control is `public,max-age=0,s-maxage=60,must-revalidate`.
+## Optional application smoke
 
-Report timestamps in UTC and the user's local timezone when useful.
+Restart IronworksTranslator because resource selection occurs at handler initialization. Confirm
+`RemotePreferred` source, revision, FCS commit, cache write, CHATLOG polling, and relevant Talk
+translation. Do not claim application or live-game behavior from workflow evidence.
 
-## Diagnose a failed publish safely
+## Report
 
-A failed final verification does not prove upload failure. Before retrying, inspect separately:
-
-1. workflow-generated revision and manifest;
-2. R2 immutable object existence and read-back bytes;
-3. public immutable endpoint;
-4. public latest pointer;
-5. Git production manifest and latest record.
-
-Never overwrite an existing immutable revision with different bytes. Never dispatch a blind retry until the actual partial state is known.
-
-Do not print secret values, credential identifiers, reviewer identities, account IDs, or protected-environment internals. Metadata-only security inspection must follow repository `AGENTS.md`.
-
-## Run post-publication application smoke
-
-Restart IronworksTranslator because resource selection occurs at handler initialization. Confirm:
-
-- `RemotePreferred` selects `ResourceSource.Remote`;
-- selected revision and FCS commit equal production;
-- cache latest and manifest are written;
-- cached manifest SHA-256 equals the selected revision;
-- standard Talk and BattleTalk translation reach the overlay in `Speaker: Text` form;
-- CHATLOG still polls normally;
-- no legacy `address.json` or manual hot reload is used.
-
-Distinguish:
-
-- workflow and byte verification;
-- host application startup;
-- automatic remote selection and cache behavior;
-- actual live translation and overlay behavior.
-
-Do not claim the last three from CI evidence.
-
-## Report completion
-
-Include:
-
-- workflow run URL and conclusion;
-- production revision and record commit;
-- FCS, generator, verifier, game version, and executable hash;
-- R2 read-back, public latest, immutable bytes, cache headers, and Git blob comparisons;
-- IronworksTranslator restart and live-smoke status;
-- any unverified or manually deferred layer.
+Include run URL, target revision, record commit, FCS and generator SHAs, validation status, R2
+read-back, public/Git byte comparison, cache headers, and any application checks actually performed.

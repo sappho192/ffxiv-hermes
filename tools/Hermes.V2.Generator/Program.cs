@@ -132,12 +132,17 @@ internal static partial class Program {
         ExtractedMetadata metadata = FcsMetadataExtractor.Extract(assemblyPath);
         BattleTalkProbeMetadata dialogue = FcsMetadataExtractor.ExtractBattleTalkProbe(assemblyPath);
         string minimumSharlayanVersion = Required(options, "minimum-sharlayan-version");
-        if (minimumSharlayanVersion != "9.2.0") {
+        if (SemanticVersionComparer.Compare(minimumSharlayanVersion, "9.2.0") < 0) {
             throw new InvalidOperationException(
-                "BattleTalk manifests require minimum Sharlayan version 9.2.0.");
+                "BattleTalk manifests require minimum Sharlayan version 9.2.0 or newer.");
         }
 
         Validation validation = CreateValidation(options);
+        if (validation.Status == "generated"
+            && SemanticVersionComparer.Compare(minimumSharlayanVersion, "9.2.1") < 0) {
+            throw new InvalidOperationException(
+                "Generated manifests require minimum Sharlayan version 9.2.1 or newer.");
+        }
         HermesManifest manifest = new(
             2,
             new Compatibility(minimumSharlayanVersion, 1),
@@ -256,12 +261,14 @@ internal static partial class Program {
         string status = Required(options, "validation-status");
         return status switch {
             "candidate" => new Validation(status),
+            "generated" => new Validation(status),
             "live-verified" => new Validation(
                 status,
                 Required(options, "game-version"),
                 RequiredHex(options, "executable-sha256", 64),
                 RequiredSha(options, "verifier-commit")),
-            _ => throw new ArgumentException("validation-status must be candidate or live-verified.")
+            _ => throw new ArgumentException(
+                "validation-status must be candidate, generated, or live-verified.")
         };
     }
 

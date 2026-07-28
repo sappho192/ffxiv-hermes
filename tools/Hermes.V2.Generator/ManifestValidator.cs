@@ -93,8 +93,11 @@ internal static partial class ManifestValidator {
 
         JsonNode? battleTalk = root["resources"]!["battleTalk"];
         if (battleTalk != null) {
-            if (root["compatibility"]!["minimumSharlayanVersion"]!.GetValue<string>() != "9.2.0") {
-                throw new InvalidOperationException("BattleTalk manifests must require Sharlayan 9.2.0.");
+            string minimumVersion =
+                root["compatibility"]!["minimumSharlayanVersion"]!.GetValue<string>();
+            if (SemanticVersionComparer.Compare(minimumVersion, "9.2.0") < 0) {
+                throw new InvalidOperationException(
+                    "BattleTalk manifests must require Sharlayan 9.2.0 or newer.");
             }
 
             string[] sharedOffsets = [
@@ -142,6 +145,15 @@ internal static partial class ManifestValidator {
                     > arrayData["updateStateOffset"]!.GetValue<int>()) {
                 throw new InvalidOperationException("BattleTalk array headers and value pointers are inconsistent.");
             }
+        }
+
+        string validationStatus = root["validation"]!["status"]!.GetValue<string>();
+        if (validationStatus == "generated"
+            && SemanticVersionComparer.Compare(
+                root["compatibility"]!["minimumSharlayanVersion"]!.GetValue<string>(),
+                "9.2.1") < 0) {
+            throw new InvalidOperationException(
+                "Generated manifests must require Sharlayan 9.2.1 or newer.");
         }
     }
 

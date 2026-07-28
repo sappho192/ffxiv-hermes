@@ -6,7 +6,7 @@ using System.Text.Json.Nodes;
 internal static class ManifestDiff {
     internal static string Create(byte[] currentBytes, string? previousPath, string revision) {
         StringBuilder output = new StringBuilder()
-            .AppendLine("# Hermes v2 candidate")
+            .AppendLine("# Hermes v2 generated manifest")
             .AppendLine()
             .AppendLine($"- Resource revision: `{revision}`");
 

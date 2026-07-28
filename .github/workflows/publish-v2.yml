@@ -1,33 +1,17 @@
-name: Publish Hermes v2
+name: Roll back Hermes v2
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Promote a verified FCS commit or roll latest back
+        description: Select the preceding production revision or an explicit revision
         required: true
         type: choice
         options:
-          - promote
-          - rollback
-      fcs_commit:
-        description: Exact 40-character FCS commit (promote only)
-        required: false
-        type: string
-      game_version:
-        description: Verified game version (promote only)
-        required: false
-        type: string
-      executable_sha256:
-        description: Verified ffxiv_dx11.exe SHA-256 (promote only)
-        required: false
-        type: string
-      verifier_commit:
-        description: Exact verifier commit (promote only)
-        required: false
-        type: string
+          - rollback-previous
+          - rollback-revision
       rollback_revision:
-        description: Existing sha256:<hex> revision (rollback only)
+        description: Existing sha256:<hex> revision (rollback-revision only)
         required: false
         type: string
 
@@ -36,7 +20,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  rollback:
     runs-on: ubuntu-latest
     environment: main
     permissions:
@@ -52,6 +36,8 @@ jobs:
     steps:
       - name: Checkout Hermes
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       - name: Set up .NET
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
@@ -63,7 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = main || {
-            echo "Publish Hermes v2 must be dispatched from main." >&2
+            echo "Hermes v2 rollback must be dispatched from main." >&2
             exit 1
           }
           git fetch origin main
@@ -72,127 +58,96 @@ jobs:
             exit 1
           }
 
-      - name: Validate dispatch inputs
+      - name: Resolve rollback revision
+        id: target
         shell: bash
         env:
           MODE: ${{ inputs.mode }}
-          FCS_COMMIT: ${{ inputs.fcs_commit }}
-          GAME_VERSION: ${{ inputs.game_version }}
-          EXECUTABLE_SHA256: ${{ inputs.executable_sha256 }}
-          VERIFIER_COMMIT: ${{ inputs.verifier_commit }}
-          ROLLBACK_REVISION: ${{ inputs.rollback_revision }}
+          REQUESTED_REVISION: ${{ inputs.rollback_revision }}
         run: |
           set -euo pipefail
-          test "$V2_PUBLIC_BASE_URL" = "https://hermes.sapphosound.com/v2"
-          if [[ "$MODE" == promote ]]; then
-            [[ "$FCS_COMMIT" =~ ^[0-9a-f]{40}$ ]]
-            [[ -n "$GAME_VERSION" ]]
-            [[ "$EXECUTABLE_SHA256" =~ ^[0-9a-f]{64}$ ]]
-            [[ "$VERIFIER_COMMIT" =~ ^[0-9a-f]{40}$ ]]
-            [[ -f "v2/candidates/$FCS_COMMIT.json" ]] || { echo "Merged candidate not found for $FCS_COMMIT" >&2; exit 1; }
+          current_revision="$(jq -r '.resourceRevision' v2/latest.json)"
+          if [[ "$MODE" == rollback-revision ]]; then
+            revision="$REQUESTED_REVISION"
+            [[ "$revision" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+              echo "rollback_revision must be sha256:<64 lowercase hex>." >&2
+              exit 1
+            }
           else
-            [[ "$ROLLBACK_REVISION" =~ ^sha256:[0-9a-f]{64}$ ]]
+            revision="$(
+              git log -p --format= -- v2/latest.json \
+                | sed -n 's/^[-+] *\"resourceRevision\": \"\\(sha256:[0-9a-f]\\{64\\}\\)\",/\\1/p' \
+                | awk -v current="$current_revision" '$0 != current { print; exit }'
+            )"
+            [[ "$revision" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+              echo "Could not resolve the preceding production revision from git history." >&2
+              exit 1
+            }
           fi
-
-      - name: Rebuild live-verified manifest
-        if: inputs.mode == 'promote'
-        shell: bash
-        env:
-          FCS_COMMIT: ${{ inputs.fcs_commit }}
-          GAME_VERSION: ${{ inputs.game_version }}
-          EXECUTABLE_SHA256: ${{ inputs.executable_sha256 }}
-          VERIFIER_COMMIT: ${{ inputs.verifier_commit }}
-        run: |
-          set -euo pipefail
-          mkdir -p external/FFXIVClientStructs publish-v2
-          git -C external/FFXIVClientStructs init
-          git -C external/FFXIVClientStructs remote add origin https://github.com/aers/FFXIVClientStructs.git
-          git -C external/FFXIVClientStructs fetch --depth 1 origin "$FCS_COMMIT"
-          git -C external/FFXIVClientStructs checkout --detach FETCH_HEAD
-          test "$(git -C external/FFXIVClientStructs rev-parse HEAD)" = "$FCS_COMMIT"
-          dotnet build external/FFXIVClientStructs/FFXIVClientStructs/FFXIVClientStructs.csproj -c Release
-          dotnet test tests/Hermes.V2.Generator.Tests/Hermes.V2.Generator.Tests.csproj -c Release
-          dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- generate \
-            --repository-root "$GITHUB_WORKSPACE" \
-            --fcs-directory "$GITHUB_WORKSPACE/external/FFXIVClientStructs" \
-            --fcs-commit "$FCS_COMMIT" \
-            --generator-commit "$GITHUB_SHA" \
-            --minimum-sharlayan-version 9.2.0 \
-            --validation-status live-verified \
-            --game-version "$GAME_VERSION" \
-            --executable-sha256 "$EXECUTABLE_SHA256" \
-            --verifier-commit "$VERIFIER_COMMIT" \
-            --schema schemas/hermes-v2.schema.json \
-            --output publish-v2/manifest.json > publish-v2/revision.txt
-          jq -S '{roots,resources}' "v2/candidates/$FCS_COMMIT.json" > publish-v2/candidate-resources.json
-          jq -S '{roots,resources}' publish-v2/manifest.json > publish-v2/production-resources.json
-          cmp --silent publish-v2/candidate-resources.json publish-v2/production-resources.json
-
-      - name: Fetch rollback manifest
-        if: inputs.mode == 'rollback'
-        shell: bash
-        env:
-          REVISION: ${{ inputs.rollback_revision }}
-        run: |
-          set -euo pipefail
-          mkdir -p publish-v2
-          aws s3api get-object \
-            --bucket "$R2_BUCKET" \
-            --key "v2/manifests/$REVISION.json" \
-            --endpoint-url "$R2_ENDPOINT" \
-            publish-v2/manifest.json >/dev/null
-          printf '%s\n' "$REVISION" > publish-v2/revision.txt
-
-      - name: Validate final manifest and revision
-        shell: bash
-        run: |
-          set -euo pipefail
+          test "$revision" != "$current_revision" || {
+            echo "Rollback target is already current." >&2
+            exit 1
+          }
+          digest="${revision#sha256:}"
+          manifest="v2/manifests/$digest.json"
+          test -f "$manifest" || {
+            echo "Rollback manifest is not recorded in git: $revision" >&2
+            exit 1
+          }
+          mkdir -p rollback-v2
+          cp "$manifest" rollback-v2/manifest.json
           dotnet build tools/Hermes.V2.Generator/Hermes.V2.Generator.csproj -c Release
-          revision="$(tr -d '\r\n' < publish-v2/revision.txt)"
-          calculated="$(dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- validate --manifest publish-v2/manifest.json --schema schemas/hermes-v2.schema.json)"
+          calculated="$(dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- \
+            validate --manifest rollback-v2/manifest.json --schema schemas/hermes-v2.schema.json)"
           test "$revision" = "$calculated"
-          test "$(jq -r '.validation.status' publish-v2/manifest.json)" = "live-verified"
-          printf '%s\n' "$revision" > publish-v2/revision.txt
-
-      - name: Upload immutable manifest and verify read-back
-        if: inputs.mode == 'promote'
-        shell: bash
-        run: |
-          set -euo pipefail
-          revision="$(cat publish-v2/revision.txt)"
-          key="v2/manifests/$revision.json"
-          if aws s3api head-object --bucket "$R2_BUCKET" --key "$key" --endpoint-url "$R2_ENDPOINT" >/dev/null 2>&1; then
-            aws s3api get-object --bucket "$R2_BUCKET" --key "$key" --endpoint-url "$R2_ENDPOINT" publish-v2/readback.json >/dev/null
-            cmp --silent publish-v2/manifest.json publish-v2/readback.json
-          else
-            aws s3api put-object \
-              --bucket "$R2_BUCKET" \
-              --key "$key" \
-              --body publish-v2/manifest.json \
-              --content-type application/json \
-              --cache-control "public,max-age=31536000,immutable" \
-              --endpoint-url "$R2_ENDPOINT" >/dev/null
-            aws s3api get-object --bucket "$R2_BUCKET" --key "$key" --endpoint-url "$R2_ENDPOINT" publish-v2/readback.json >/dev/null
-            cmp --silent publish-v2/manifest.json publish-v2/readback.json
-          fi
-
-      - name: Publish latest pointer last
-        shell: bash
-        run: |
-          set -euo pipefail
-          revision="$(cat publish-v2/revision.txt)"
-          fcs_commit="$(jq -r '.source.fcsCommit' publish-v2/manifest.json)"
+          status="$(jq -r '.validation.status' rollback-v2/manifest.json)"
+          [[ "$status" == generated || "$status" == live-verified ]]
+          fcs_commit="$(jq -r '.source.fcsCommit' rollback-v2/manifest.json)"
           jq -n \
             --arg revision "$revision" \
             --arg manifest "manifests/$revision.json" \
             --arg fcsCommit "$fcs_commit" \
             --arg publishedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{schemaVersion:2,resourceRevision:$revision,manifest:$manifest,fcsCommit:$fcsCommit,publishedAt:$publishedAt}' \
-            > publish-v2/latest.json
+            > rollback-v2/latest.json
+          printf '%s\n' "$revision" > rollback-v2/revision.txt
+
+      - name: Verify immutable manifest read-back
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision="$(cat rollback-v2/revision.txt)"
+          aws s3api get-object \
+            --bucket "$R2_BUCKET" \
+            --key "v2/manifests/$revision.json" \
+            --endpoint-url "$R2_ENDPOINT" \
+            rollback-v2/readback.json >/dev/null
+          cmp --silent rollback-v2/manifest.json rollback-v2/readback.json
+
+      - name: Record rollback in git
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$GITHUB_SHA" = "$(git rev-parse origin/main)" || {
+            echo "main advanced while resolving rollback; refusing stale rollback." >&2
+            exit 1
+          }
+          cp rollback-v2/latest.json v2/latest.json
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add v2/latest.json
+          git commit -m "Roll back Hermes v2 to $(cat rollback-v2/revision.txt | cut -c8-19)"
+          git push origin HEAD:main
+
+      - name: Publish rollback pointer
+        shell: bash
+        run: |
+          set -euo pipefail
           aws s3api put-object \
             --bucket "$R2_BUCKET" \
             --key v2/latest.json \
-            --body publish-v2/latest.json \
+            --body rollback-v2/latest.json \
             --content-type application/json \
             --cache-control "public,max-age=0,s-maxage=60,must-revalidate" \
             --endpoint-url "$R2_ENDPOINT" >/dev/null
@@ -209,7 +164,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          revision="$(cat publish-v2/revision.txt)"
+          revision="$(cat rollback-v2/revision.txt)"
           base="${V2_PUBLIC_BASE_URL%/}"
           curl_args=(
             --ipv4
@@ -221,8 +176,9 @@ jobs:
             --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/127.0.0.0 Safari/537.36"
           )
           for attempt in {1..13}; do
-            if curl "${curl_args[@]}" "$base/latest.json?revision=${revision#sha256:}" -o publish-v2/public-latest.json \
-              && [[ "$(jq -r '.resourceRevision' publish-v2/public-latest.json)" == "$revision" ]]; then
+            if curl "${curl_args[@]}" "$base/latest.json?revision=${revision#sha256:}" \
+              -o rollback-v2/public-latest.json \
+              && cmp --silent rollback-v2/latest.json rollback-v2/public-latest.json; then
               break
             fi
             if [[ "$attempt" == 13 ]]; then
@@ -233,24 +189,6 @@ jobs:
           done
           curl --retry 12 --retry-all-errors --retry-delay 10 \
             "${curl_args[@]}" \
-            "$base/manifests/$revision.json?revision=${revision#sha256:}" -o publish-v2/public-manifest.json
-          test "$(dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- revision --manifest publish-v2/public-manifest.json)" = "$revision"
-
-      - name: Record production state in git
-        shell: bash
-        run: |
-          set -euo pipefail
-          revision="$(cat publish-v2/revision.txt)"
-          digest="${revision#sha256:}"
-          mkdir -p v2/manifests
-          cp publish-v2/manifest.json "v2/manifests/$digest.json"
-          cp publish-v2/latest.json v2/latest.json
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add v2/manifests v2/latest.json
-          if git diff --cached --quiet; then
-            echo "Production state is already recorded."
-            exit 0
-          fi
-          git commit -m "Record Hermes v2 production ${digest:0:12}"
-          git push origin "HEAD:$GITHUB_REF_NAME"
+            "$base/manifests/$revision.json?revision=${revision#sha256:}" \
+            -o rollback-v2/public-manifest.json
+          cmp --silent rollback-v2/manifest.json rollback-v2/public-manifest.json

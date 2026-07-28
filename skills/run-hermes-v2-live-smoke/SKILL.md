@@ -1,15 +1,18 @@
 ---
 name: run-hermes-v2-live-smoke
-description: Validate a merged Hermes v2 candidate against a running FFXIV client with Sharlayan.LiveSmoke before production promotion. Use for candidate manifest injection, CHATLOG attach and polling, CurrentTalk and LastTalk checks, BattleTalk visibility and sequencing, and collection of game-version, executable-hash, and verifier-commit evidence.
+description: Diagnose a Hermes v2 candidate or generated manifest against a running FFXIV client with Sharlayan.LiveSmoke. Use for optional CHATLOG attach and polling, CurrentTalk and LastTalk checks, BattleTalk visibility and sequencing, or investigation after an automatic publication problem; this is not a default publication gate.
 ---
 
 # Run Hermes v2 Live Smoke
 
-Use the Sharlayan source verifier to load a candidate directly. Do not route pre-production validation through IronworksTranslator or the public latest endpoint.
+Use the Sharlayan source verifier to load exact manifest bytes directly. This is optional diagnostic
+evidence and does not control automatic publication.
 
 ## Preserve the trust boundary
 
-Normal Sharlayan `RemotePreferred` reads `v2/latest.json` and rejects `validation.status=candidate`. IronworksTranslator uses that normal path. `tools/Sharlayan.LiveSmoke` is the intended exception: `--manifest` supplies local bytes through an internal override and permits a candidate only for live verification.
+Normal Sharlayan `RemotePreferred` reads `v2/latest.json`, accepts `generated` or historic
+`live-verified`, and rejects `candidate`. IronworksTranslator uses that normal path.
+`tools/Sharlayan.LiveSmoke --manifest` is the intended local override for candidate bytes.
 
 Do not:
 
@@ -139,7 +142,7 @@ Generate at least one new game chat entry during the interval. Require cursor pr
 
 Even if CHATLOG offsets did not change, run this check because all resources are selected and applied as one revision.
 
-## Collect promotion evidence
+## Collect diagnostic evidence
 
 Read the game version from `ffxivgame.ver`, not the PE file version:
 
@@ -171,4 +174,6 @@ Record only:
 
 Report each scenario independently. A partial run is not an overall PASS.
 
-Stop before production workflow dispatch unless the user explicitly authorizes promotion. State that IronworksTranslator translation and overlay validation remains a post-publication check.
+Do not change production from this skill. State whether the tested bytes are a candidate, generated
+revision, or current public revision, and keep IronworksTranslator translation and overlay validation
+as a separate evidence layer.

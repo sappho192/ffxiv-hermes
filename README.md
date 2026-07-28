@@ -8,20 +8,21 @@ FFXIVClientStructs-based manifests for CHATLOG and the last standard NPC Talk.
 
 - `schemas/hermes-v2.schema.json` defines the manifest contract.
 - `tools/Hermes.V2.Generator` extracts metadata from an exact FCS checkout.
-- `v2/fixtures/manifest.valid.json` is the candidate contract fixture used by
+- `v2/fixtures/manifest.valid.json` is the contract fixture used by
   Hermes and Sharlayan.Lite tests.
-- `fcs-v2-candidate.yml` checks FCS `main` every six hours and opens a candidate
-  pull request only when runtime resources change.
-- `publish-v2.yml` rebuilds a live-verified manifest in the protected `main`
-  environment, uploads the immutable object, and updates
-  `v2/latest.json` last. It also supports rollback to an existing revision.
+- `fcs-v2-publish.yml` checks FCS `main` every six hours, runs deterministic
+  generation and static validation, and publishes changed runtime resources with
+  `validation.status=generated`. The external FCS build job has no production
+  credentials; a separate job revalidates its artifact before publication.
+- `publish-v2.yml` rolls `v2/latest.json` back to the preceding or an explicitly
+  selected immutable revision.
 
-Candidate metadata is never production metadata. Promotion requires game version,
-executable SHA-256, and verifier commit values obtained from a Sharlayan live smoke
-run.
+Generated metadata is transparent about its evidence: it carries no game version,
+executable hash, or verifier commit. Live smoke remains available as an optional
+diagnostic procedure, but it is not a publication gate.
 
-The initial v2 contract requires Sharlayan.Lite 9.1.2. Live smoke remains a manual
-Windows/GPU procedure because the game login requires two-factor authentication.
+Generated manifests require Sharlayan.Lite 9.2.1 or newer. Older clients reject the
+new status and use their last valid cache or embedded manifest.
 
 The v2 public base is `https://hermes.sapphosound.com/v2/`. Public objects are
 therefore served as `latest.json` and `manifests/sha256:<hex>.json` below that base;

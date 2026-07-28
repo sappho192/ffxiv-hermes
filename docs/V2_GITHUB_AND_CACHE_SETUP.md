@@ -21,48 +21,25 @@ gh api repos/sappho192/ffxiv-hermes/environments/main/deployment-branch-policies
 
 `gh secret list`는 등록된 식별자와 metadata만 표시하며 secret 값은 반환하지 않는다.
 
-## Production environment
+## Publication environment
 
 Repository의 **Settings → Environments → main**에서 다음을 확인한다.
 
 1. Deployment branches and tags에서 selected branch로 정확히 `main`을 추가한다.
-2. Required reviewer와 self-review 정책이 현재 운영 주체의 승인 모델에 맞는지 확인한다.
-3. Administrator bypass 정책이 의도한 release gate와 일치하는지 확인한다.
+2. Required reviewer가 설정되어 있지 않은지 확인한다.
+3. Environment는 credential scope에만 사용하고 수동 승인 gate로 사용하지 않는다.
 
-`publish-v2.yml`은 `main` environment를 사용하며, workflow 자체도 `main`의 현재 HEAD에서
-dispatch된 실행만 허용한다. Environment approval 전에는 R2 secret이 job에 제공되지 않는다.
-최초 production 승격 전에 manifest를 받아들일 수 있는 Sharlayan.Lite 9.1.2를 먼저 배포하고,
-그 버전의 embedded manifest도 동일 계약으로 갱신해야 한다.
+`fcs-v2-publish.yml`의 publish job과 `publish-v2.yml`은 `main` environment를 사용하며,
+workflow 자체도 `main`의 현재 HEAD에서 실행된 경우만 허용한다. 외부 FCS를 build하고
+manifest를 생성하는 job에는 environment나 production secret을 제공하지 않는다. 자동
+publication 전에 `generated` 상태를 받아들일 수 있는 Sharlayan.Lite 9.2.1을 먼저 배포해야
+한다.
 
-## Candidate PR token
+## Repository write access
 
-Candidate job에는 production environment를 연결하지 않는다. Candidate branch push와 PR 생성용
-fine-grained personal access token을 다음 최소 범위로 만든다.
-
-- Repository access: **Only select repositories**에서 이 저장소만 선택
-- Repository permissions:
-  - **Contents: Read and write**
-  - **Pull requests: Read and write**
-  - Metadata는 GitHub가 요구하는 read 권한만 사용
-- Expiration: 운영 가능한 짧은 주기(권장 90일)로 설정하고 만료 전에 교체
-
-Repository의 **Settings → Secrets and variables → Actions → New repository secret**에서
-workflow가 참조하는 repository secret에 토큰을 저장한다. 정확한 식별자는 workflow에서
-확인한다. Protected environment secret으로 저장하면 environment를 사용하지 않는 candidate
-job에서 읽을 수 없으므로 안 된다.
-
-```powershell
-rg -n '\$\{\{\s*secrets\.' .github/workflows/fcs-v2-candidate.yml
-gh secret list --repo sappho192/ffxiv-hermes
-```
-
-등록 또는 교체 시에는 workflow에서 확인한 식별자를 사용하고, token을 명령행 인자로 남기지
-않으며 `gh secret set`이 표시하는 비공개 입력으로 전달한다.
-
-Workflow의 checkout, branch push 및 `gh pr create`가 모두 이 credential을 사용한다. 전용
-credential을 사용하면
-자동 생성 PR의 `pull_request` workflow가 `GITHUB_TOKEN` 생성 PR처럼 별도 승인 대기 상태가
-되는 것을 피할 수 있다.
+Repository의 **Settings → Actions → General → Workflow permissions**에서
+`Read and write permissions`를 사용한다. 두 운영 workflow는 job 단위로
+`contents: write`만 요청하며, 후보 branch나 PR 생성용 별도 token은 사용하지 않는다.
 
 ## Cache policy
 
@@ -79,7 +56,7 @@ Mutable latest pointer는 client cache에서는 즉시 stale로 만들고 Cloudf
 Cache-Control: public,max-age=0,s-maxage=60,must-revalidate
 ```
 
-Sharlayan은 latest ETag를 사용하며 원격 장애 시 검증된 local cache와 embedded manifest로
+Sharlayan은 latest ETag를 사용하며 원격 장애 시 유효한 local cache와 embedded manifest로
 fallback하므로 stale latest를 CDN에서 별도로 제공하지 않는다. Publish workflow는 CDN의 기존
 latest가 최대 60초 남아 있을 수 있음을 고려해 public 검증을 최대 120초 동안 재시도한다.
 
