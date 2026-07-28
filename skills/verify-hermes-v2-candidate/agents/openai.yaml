@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify Hermes v2 Candidate"
+  short_description: "Validate candidate PRs, CI, and canonical JSON"
+  default_prompt: "Use $verify-hermes-v2-candidate to validate the latest Hermes v2 candidate without publishing it."

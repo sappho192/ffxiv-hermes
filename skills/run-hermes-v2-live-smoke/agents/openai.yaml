@@ -1,0 +1,4 @@
+interface:
+  display_name: "Run Hermes v2 Live Smoke"
+  short_description: "Test candidate resources against a running FFXIV client"
+  default_prompt: "Use $run-hermes-v2-live-smoke to validate a merged Hermes v2 candidate in the live game."

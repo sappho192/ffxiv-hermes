@@ -9,6 +9,15 @@ This file applies to the whole `ffxiv-hermes` repository.
 - When using `gh`, always pass `--repo sappho192/ffxiv-hermes`.
 - Keep commits scoped. Do not stage generated, temporary, or unrelated user files.
 
+## Repository skills
+
+- For candidate PR, CI, canonical-byte, and public-isolation checks, read and follow
+  `skills/verify-hermes-v2-candidate/SKILL.md`.
+- For pre-production testing against a running FFXIV client, read and follow
+  `skills/run-hermes-v2-live-smoke/SKILL.md`.
+- For an explicitly authorized production promotion, partial-failure diagnosis, and public
+  verification, read and follow `skills/verify-hermes-v2-production/SKILL.md`.
+
 ## Hermes v2 invariants
 
 - The public v2 base is `https://hermes.sapphosound.com/v2/`.

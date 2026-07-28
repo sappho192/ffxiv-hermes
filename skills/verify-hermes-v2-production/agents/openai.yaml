@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify Hermes v2 Production"
+  short_description: "Promote and verify live Hermes v2 production resources"
+  default_prompt: "Use $verify-hermes-v2-production to promote an approved candidate and verify every production surface."
