@@ -1,5 +1,13 @@
 # ffxiv-hermes v2 구현 계획
 
+> 2026-07-28 운영 정책 변경: 이 문서의 candidate PR, 필수 live smoke, protected approval,
+> `live-verified` 승격 단계는 초기 rollout의 역사적 설계다. 현재 기본 경로는
+> `.github/workflows/fcs-v2-publish.yml`의 6시간 주기 정적 검증 후
+> `validation.status=generated` 자동 publication이며, 문제 발생 시
+> `.github/workflows/publish-v2.yml`로 이전 또는 명시적 immutable revision을 선택해
+> rollback한다. 현재 운영 절차는 저장소 `AGENTS.md`, `README.md`, `v2/README.md`, 그리고
+> repository skills를 우선한다.
+
 ## 1. 목적
 
 `ffxiv-hermes`를 수동으로 찾은 단일 NPC 대화 주소의 배포 저장소에서 FFXIVClientStructs(FCS) 기반 런타임 메타데이터의 생성, 검증, 버전 관리 및 배포 저장소로 확장한다.

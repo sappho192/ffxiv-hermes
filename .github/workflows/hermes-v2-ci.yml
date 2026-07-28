@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - ".gitattributes"
+      - ".github/workflows/fcs-v2-publish.yml"
       - ".github/workflows/hermes-v2-ci.yml"
+      - ".github/workflows/publish-v2.yml"
       - "schemas/**"
       - "tests/Hermes.V2.Generator.*/**"
       - "tools/Hermes.V2.Generator/**"
@@ -13,7 +15,9 @@ on:
     branches: ["main"]
     paths:
       - ".gitattributes"
+      - ".github/workflows/fcs-v2-publish.yml"
       - ".github/workflows/hermes-v2-ci.yml"
+      - ".github/workflows/publish-v2.yml"
       - "schemas/**"
       - "tests/Hermes.V2.Generator.*/**"
       - "tools/Hermes.V2.Generator/**"

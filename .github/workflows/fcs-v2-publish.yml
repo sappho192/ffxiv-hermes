@@ -1,0 +1,420 @@
+name: Publish Hermes v2 from FCS
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      fcs_commit:
+        description: Exact 40-character FCS commit (defaults to current main)
+        required: false
+        type: string
+      force_regenerate:
+        description: Regenerate even when this FCS commit was already processed
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: publish-hermes-v2
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      action: ${{ steps.target.outputs.action }}
+      already_processed: ${{ steps.fcs.outputs.already_processed }}
+      fcs_commit: ${{ steps.fcs.outputs.commit }}
+      revision: ${{ steps.target.outputs.revision }}
+    steps:
+      - name: Checkout Hermes
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Require current main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = main || {
+            echo "Hermes v2 publication must run from main." >&2
+            exit 1
+          }
+          git fetch origin main
+          test "$GITHUB_SHA" = "$(git rev-parse origin/main)" || {
+            echo "The selected workflow revision is not the current main head." >&2
+            exit 1
+          }
+
+      - name: Resolve FCS main once
+        id: fcs
+        shell: bash
+        env:
+          REQUESTED_FCS_COMMIT: ${{ inputs.fcs_commit }}
+          FORCE_REGENERATE: ${{ inputs.force_regenerate }}
+        run: |
+          set -euo pipefail
+          commit="$REQUESTED_FCS_COMMIT"
+          if [[ -z "$commit" ]]; then
+            commit="$(git ls-remote https://github.com/aers/FFXIVClientStructs.git refs/heads/main | cut -f1)"
+          fi
+          [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "Invalid FCS commit: $commit" >&2
+            exit 1
+          }
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          if [[ "$FORCE_REGENERATE" != "true" ]] \
+            && jq -e --arg commit "$commit" '.fcsCommit == $commit' v2/source/fcs-head.json >/dev/null; then
+            echo "already_processed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_processed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build generator
+        run: dotnet build tools/Hermes.V2.Generator/Hermes.V2.Generator.csproj -c Release
+
+      - name: Checkout exact FCS commit
+        if: steps.fcs.outputs.already_processed != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p external/FFXIVClientStructs
+          git -C external/FFXIVClientStructs init
+          git -C external/FFXIVClientStructs remote add origin https://github.com/aers/FFXIVClientStructs.git
+          git -C external/FFXIVClientStructs fetch --depth 1 origin "${{ steps.fcs.outputs.commit }}"
+          git -C external/FFXIVClientStructs checkout --detach FETCH_HEAD
+          test "$(git -C external/FFXIVClientStructs rev-parse HEAD)" = "${{ steps.fcs.outputs.commit }}"
+
+      - name: Build FCS and run generator tests
+        if: steps.fcs.outputs.already_processed != 'true'
+        run: |
+          dotnet build external/FFXIVClientStructs/FFXIVClientStructs/FFXIVClientStructs.csproj -c Release
+          dotnet test tests/Hermes.V2.Generator.Tests/Hermes.V2.Generator.Tests.csproj -c Release
+
+      - name: Generate twice
+        if: steps.fcs.outputs.already_processed != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p publish-v2
+          revision="$(jq -r '.resourceRevision' v2/latest.json)"
+          previous="v2/manifests/${revision#sha256:}.json"
+          test -f "$previous"
+          common=(
+            generate
+            --repository-root "$GITHUB_WORKSPACE"
+            --fcs-directory "$GITHUB_WORKSPACE/external/FFXIVClientStructs"
+            --fcs-commit "${{ steps.fcs.outputs.commit }}"
+            --generator-commit "$GITHUB_SHA"
+            --minimum-sharlayan-version 9.2.1
+            --validation-status generated
+            --schema "$GITHUB_WORKSPACE/schemas/hermes-v2.schema.json"
+            --diff-against "$previous"
+          )
+          dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- \
+            "${common[@]}" --output publish-v2/generated-one.json --summary publish-v2/summary.md \
+            > publish-v2/generated-revision.txt
+          dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- \
+            "${common[@]}" --output publish-v2/generated-two.json \
+            > publish-v2/generated-revision-two.txt
+          cmp --silent publish-v2/generated-one.json publish-v2/generated-two.json
+          cmp --silent publish-v2/generated-revision.txt publish-v2/generated-revision-two.txt
+
+      - name: Select target revision
+        id: target
+        shell: bash
+        env:
+          FCS_COMMIT: ${{ steps.fcs.outputs.commit }}
+          ALREADY_PROCESSED: ${{ steps.fcs.outputs.already_processed }}
+        run: |
+          set -euo pipefail
+          mkdir -p publish-v2
+          current_revision="$(jq -r '.resourceRevision' v2/latest.json)"
+          current_manifest="v2/manifests/${current_revision#sha256:}.json"
+          test -f "$current_manifest"
+          action=reconcile
+          changed=false
+          if [[ "$ALREADY_PROCESSED" != "true" ]]; then
+            jq -S '{roots,resources}' "$current_manifest" > publish-v2/current-resources.json
+            jq -S '{roots,resources}' publish-v2/generated-one.json > publish-v2/generated-resources.json
+            if cmp --silent publish-v2/current-resources.json publish-v2/generated-resources.json; then
+              action=record-only
+            else
+              action=publish
+              changed=true
+            fi
+          fi
+
+          if [[ "$changed" == "true" ]]; then
+            cp publish-v2/generated-one.json publish-v2/target-manifest.json
+            revision="$(tr -d '\r\n' < publish-v2/generated-revision.txt)"
+            jq -n \
+              --arg revision "$revision" \
+              --arg manifest "manifests/$revision.json" \
+              --arg fcsCommit "$FCS_COMMIT" \
+              --arg publishedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              '{schemaVersion:2,resourceRevision:$revision,manifest:$manifest,fcsCommit:$fcsCommit,publishedAt:$publishedAt}' \
+              > publish-v2/target-latest.json
+          else
+            cp "$current_manifest" publish-v2/target-manifest.json
+            cp v2/latest.json publish-v2/target-latest.json
+            revision="$current_revision"
+          fi
+
+          calculated="$(dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- \
+            validate --manifest publish-v2/target-manifest.json --schema schemas/hermes-v2.schema.json)"
+          test "$revision" = "$calculated"
+          status="$(jq -r '.validation.status' publish-v2/target-manifest.json)"
+          [[ "$status" == generated || "$status" == live-verified ]]
+          printf '%s\n' "$revision" > publish-v2/target-revision.txt
+          printf '%s\n' "$action" > publish-v2/action.txt
+          printf '%s\n' "$FCS_COMMIT" > publish-v2/fcs-commit.txt
+          echo "action=$action" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+
+      - name: Upload generated evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hermes-v2-generated
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            publish-v2/action.txt
+            publish-v2/fcs-commit.txt
+            publish-v2/generated-one.json
+            publish-v2/generated-revision.txt
+            publish-v2/summary.md
+            publish-v2/target-latest.json
+            publish-v2/target-manifest.json
+            publish-v2/target-revision.txt
+
+  publish:
+    needs: generate
+    runs-on: ubuntu-latest
+    environment: main
+    permissions:
+      contents: write
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+      AWS_DEFAULT_OUTPUT: ${{ secrets.AWS_DEFAULT_OUTPUT }}
+      R2_ENDPOINT: https://36b6c4744ccceb0acf36d8951bb741ab.r2.cloudflarestorage.com
+      R2_BUCKET: ffxiv-hermes
+      V2_PUBLIC_BASE_URL: https://hermes.sapphosound.com/v2
+    steps:
+      - name: Checkout Hermes
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Download generated evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: hermes-v2-generated
+          path: publish-v2
+
+      - name: Validate generated evidence on current main
+        shell: bash
+        env:
+          TARGET_ACTION: ${{ needs.generate.outputs.action }}
+          FCS_COMMIT: ${{ needs.generate.outputs.fcs_commit }}
+          TARGET_REVISION: ${{ needs.generate.outputs.revision }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = main
+          git fetch origin main
+          test "$GITHUB_SHA" = "$(git rev-parse origin/main)"
+          test "$TARGET_ACTION" = "$(cat publish-v2/action.txt)"
+          test "$FCS_COMMIT" = "$(cat publish-v2/fcs-commit.txt)"
+          test "$TARGET_REVISION" = "$(cat publish-v2/target-revision.txt)"
+          [[ "$FCS_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$TARGET_REVISION" =~ ^sha256:[0-9a-f]{64}$ ]]
+
+          dotnet build tools/Hermes.V2.Generator/Hermes.V2.Generator.csproj -c Release
+          calculated="$(dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- \
+            validate --manifest publish-v2/target-manifest.json --schema schemas/hermes-v2.schema.json)"
+          test "$TARGET_REVISION" = "$calculated"
+          test "$(jq -r '.resourceRevision' publish-v2/target-latest.json)" = "$TARGET_REVISION"
+          test "$(jq -r '.manifest' publish-v2/target-latest.json)" = \
+            "manifests/$TARGET_REVISION.json"
+          test "$(jq -r '.fcsCommit' publish-v2/target-latest.json)" = \
+            "$(jq -r '.source.fcsCommit' publish-v2/target-manifest.json)"
+
+          current_revision="$(jq -r '.resourceRevision' v2/latest.json)"
+          current_manifest="v2/manifests/${current_revision#sha256:}.json"
+          test -f "$current_manifest"
+          if [[ "$TARGET_ACTION" == publish ]]; then
+            test "$(jq -r '.validation.status' publish-v2/target-manifest.json)" = generated
+            test "$(jq -r '.compatibility.minimumSharlayanVersion' \
+              publish-v2/target-manifest.json)" = 9.2.1
+            test "$(jq -r '.source.fcsCommit' publish-v2/target-manifest.json)" = "$FCS_COMMIT"
+            test "$(jq -r '.source.generatorCommit' publish-v2/target-manifest.json)" = "$GITHUB_SHA"
+            jq -S '{roots,resources}' "$current_manifest" > publish-v2/current-resources.json
+            jq -S '{roots,resources}' publish-v2/target-manifest.json > publish-v2/target-resources.json
+            ! cmp --silent publish-v2/current-resources.json publish-v2/target-resources.json
+          elif [[ "$TARGET_ACTION" == record-only ]]; then
+            test -f publish-v2/generated-one.json
+            generated_revision="$(dotnet run --project tools/Hermes.V2.Generator -c Release \
+              --no-build -- validate --manifest publish-v2/generated-one.json \
+              --schema schemas/hermes-v2.schema.json)"
+            test "$generated_revision" = "$(tr -d '\r\n' < publish-v2/generated-revision.txt)"
+            test "$(jq -r '.validation.status' publish-v2/generated-one.json)" = generated
+            test "$(jq -r '.compatibility.minimumSharlayanVersion' \
+              publish-v2/generated-one.json)" = 9.2.1
+            test "$(jq -r '.source.fcsCommit' publish-v2/generated-one.json)" = "$FCS_COMMIT"
+            test "$(jq -r '.source.generatorCommit' publish-v2/generated-one.json)" = "$GITHUB_SHA"
+            jq -S '{roots,resources}' "$current_manifest" > publish-v2/current-resources.json
+            jq -S '{roots,resources}' publish-v2/generated-one.json > publish-v2/generated-resources.json
+            cmp --silent publish-v2/current-resources.json publish-v2/generated-resources.json
+            cmp --silent "$current_manifest" publish-v2/target-manifest.json
+            cmp --silent v2/latest.json publish-v2/target-latest.json
+          else
+            test "$TARGET_ACTION" = reconcile
+            cmp --silent "$current_manifest" publish-v2/target-manifest.json
+            cmp --silent v2/latest.json publish-v2/target-latest.json
+          fi
+
+      - name: Upload immutable manifest and verify read-back
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision="$(cat publish-v2/target-revision.txt)"
+          key="v2/manifests/$revision.json"
+          if aws s3api head-object \
+            --bucket "$R2_BUCKET" --key "$key" --endpoint-url "$R2_ENDPOINT" >/dev/null 2>&1; then
+            aws s3api get-object \
+              --bucket "$R2_BUCKET" --key "$key" --endpoint-url "$R2_ENDPOINT" \
+              publish-v2/readback.json >/dev/null
+            cmp --silent publish-v2/target-manifest.json publish-v2/readback.json
+          else
+            if ! aws s3api put-object \
+              --bucket "$R2_BUCKET" \
+              --key "$key" \
+              --body publish-v2/target-manifest.json \
+              --content-type application/json \
+              --cache-control "public,max-age=31536000,immutable" \
+              --if-none-match "*" \
+              --endpoint-url "$R2_ENDPOINT" >/dev/null; then
+              echo "Immutable object appeared concurrently; verifying its bytes."
+            fi
+            aws s3api get-object \
+              --bucket "$R2_BUCKET" --key "$key" --endpoint-url "$R2_ENDPOINT" \
+              publish-v2/readback.json >/dev/null
+            cmp --silent publish-v2/target-manifest.json publish-v2/readback.json
+          fi
+
+      - name: Record target state in git
+        if: needs.generate.outputs.action != 'reconcile'
+        shell: bash
+        env:
+          FCS_COMMIT: ${{ needs.generate.outputs.fcs_commit }}
+          TARGET_ACTION: ${{ needs.generate.outputs.action }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$GITHUB_SHA" = "$(git rev-parse origin/main)" || {
+            echo "main advanced during generation; refusing to publish stale output." >&2
+            exit 1
+          }
+          jq -n --arg commit "$FCS_COMMIT" '{fcsCommit:$commit}' > v2/source/fcs-head.json
+          if [[ "$TARGET_ACTION" == publish ]]; then
+            revision="$(cat publish-v2/target-revision.txt)"
+            digest="${revision#sha256:}"
+            manifest_path="v2/manifests/$digest.json"
+            if [[ -f "$manifest_path" ]]; then
+              cmp --silent publish-v2/target-manifest.json "$manifest_path"
+            else
+              cp publish-v2/target-manifest.json "$manifest_path"
+            fi
+            cp publish-v2/target-latest.json v2/latest.json
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add v2/manifests v2/latest.json v2/source/fcs-head.json
+          if git diff --cached --quiet; then
+            echo "Target state is already recorded."
+            exit 0
+          fi
+          if [[ "$TARGET_ACTION" == publish ]]; then
+            revision="$(cat publish-v2/target-revision.txt)"
+            git commit -m "Publish generated Hermes v2 ${revision#sha256:}"
+          else
+            git commit -m "Record unchanged FCS head ${FCS_COMMIT:0:12}"
+          fi
+          git push origin HEAD:main
+
+      - name: Publish or reconcile latest pointer
+        shell: bash
+        run: |
+          set -euo pipefail
+          if aws s3api get-object \
+            --bucket "$R2_BUCKET" --key v2/latest.json --endpoint-url "$R2_ENDPOINT" \
+            publish-v2/r2-latest.json >/dev/null 2>&1 \
+            && cmp --silent publish-v2/target-latest.json publish-v2/r2-latest.json; then
+            echo "R2 latest already matches the recorded target."
+          else
+            aws s3api put-object \
+              --bucket "$R2_BUCKET" \
+              --key v2/latest.json \
+              --body publish-v2/target-latest.json \
+              --content-type application/json \
+              --cache-control "public,max-age=0,s-maxage=60,must-revalidate" \
+              --endpoint-url "$R2_ENDPOINT" >/dev/null
+          fi
+
+      - name: Allow runner through Cloudflare
+        uses: xiaotianxt/bypass-cloudflare-for-github-action@0c44a8bb3b1c9d370e48be2becf88ef33de8d57e # v2.1.0
+        with:
+          cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          cf_zone_id: ${{ secrets.CF_ZONE_ID }}
+          cf_api_token: ${{ secrets.CF_API_TOKEN }}
+          disable_bot_fight_mode: "true"
+
+      - name: Verify public endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision="$(cat publish-v2/target-revision.txt)"
+          base="${V2_PUBLIC_BASE_URL%/}"
+          curl_args=(
+            --ipv4
+            --fail
+            --silent
+            --show-error
+            --max-time 15
+            --header "Accept: application/json"
+            --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/127.0.0.0 Safari/537.36"
+          )
+          for attempt in {1..13}; do
+            if curl "${curl_args[@]}" "$base/latest.json?revision=${revision#sha256:}" \
+              -o publish-v2/public-latest.json \
+              && cmp --silent publish-v2/target-latest.json publish-v2/public-latest.json; then
+              break
+            fi
+            if [[ "$attempt" == 13 ]]; then
+              echo "Public latest did not converge to $revision within 120 seconds." >&2
+              exit 1
+            fi
+            sleep 10
+          done
+          curl --retry 12 --retry-all-errors --retry-delay 10 \
+            "${curl_args[@]}" \
+            "$base/manifests/$revision.json?revision=${revision#sha256:}" \
+            -o publish-v2/public-manifest.json
+          cmp --silent publish-v2/target-manifest.json publish-v2/public-manifest.json
+          test "$(dotnet run --project tools/Hermes.V2.Generator -c Release --no-build -- \
+            revision --manifest publish-v2/public-manifest.json)" = "$revision"

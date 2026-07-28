@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify Hermes v2 Generated"
+  short_description: "Validate generated manifests and auto-publication safety"
+  default_prompt: "Use $verify-hermes-v2-generated to validate Hermes v2 generated-manifest automation without publishing."

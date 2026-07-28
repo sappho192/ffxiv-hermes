@@ -132,6 +132,40 @@ public sealed class GeneratorTests {
     }
 
     [Fact]
+    public void GeneratedValidationPassesWithoutLiveMetadataAndRequiresSharlayan921() {
+        string root = FindRepositoryRoot();
+        string schema = Path.Combine(root, "schemas", "hermes-v2.schema.json");
+        HermesManifest generated = CreateManifest() with {
+            Compatibility = new Compatibility("9.2.1", 1),
+            Validation = new Validation("generated"),
+        };
+
+        byte[] bytes = CanonicalJson.Serialize(generated);
+        ManifestValidator.Validate(bytes, schema);
+
+        JsonNode olderFloor = JsonNode.Parse(bytes)!;
+        olderFloor["compatibility"]!["minimumSharlayanVersion"] = "9.2.0";
+        Assert.Throws<InvalidOperationException>(
+            () => ManifestValidator.Validate(
+                Encoding.UTF8.GetBytes(olderFloor.ToJsonString()),
+                schema));
+
+        JsonNode prereleaseFloor = JsonNode.Parse(bytes)!;
+        prereleaseFloor["compatibility"]!["minimumSharlayanVersion"] = "9.2.1-preview.1";
+        Assert.Throws<InvalidOperationException>(
+            () => ManifestValidator.Validate(
+                Encoding.UTF8.GetBytes(prereleaseFloor.ToJsonString()),
+                schema));
+
+        JsonNode liveMetadata = JsonNode.Parse(bytes)!;
+        liveMetadata["validation"]!["gameVersion"] = "2026.07.16.0001.0000";
+        Assert.Throws<InvalidOperationException>(
+            () => ManifestValidator.Validate(
+                Encoding.UTF8.GetBytes(liveMetadata.ToJsonString()),
+                schema));
+    }
+
+    [Fact]
     public void OptionalBattleTalkPassesAndRejectsInvalidArraySemantics() {
         string root = FindRepositoryRoot();
         string schema = Path.Combine(root, "schemas", "hermes-v2.schema.json");
@@ -158,7 +192,7 @@ public sealed class GeneratorTests {
             1,
             "visibilityOrContentGeneration");
         HermesManifest manifest = baseline with {
-            Compatibility = new Compatibility("9.2.0", 1),
+            Compatibility = new Compatibility("9.2.1", 1),
             Resources = baseline.Resources with { BattleTalk = resource },
         };
 
