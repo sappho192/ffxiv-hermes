@@ -26,6 +26,9 @@ This file applies to the whole `ffxiv-hermes` repository.
 - `/latest/address.json` is a legacy endpoint with indefinite support. Do not remove or repurpose it.
 - Scheduled publication creates `validation.status=generated` manifests with no live-verification
   metadata. Historic `live-verified` manifests remain valid immutable revisions.
+- When generated `{roots,resources}` are unchanged, retain the canonical result under
+  `v2/generated/<sha256-hex>.json` as a repository-only audit record, advance
+  `v2/source/fcs-head.json`, and leave production latest unchanged.
 - External FCS build and generation must run in a job without production environments or secrets.
   A separate publication job revalidates the artifact before receiving R2 credentials.
 - Upload and read back the immutable manifest before replacing `v2/latest.json`.

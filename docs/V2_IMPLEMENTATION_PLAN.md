@@ -104,6 +104,8 @@ ffxiv-hermes/
     latest.json                  # 현재 production manifest를 가리키는 포인터
     manifests/
       <sha256-hex>.json          # immutable 검증 완료 manifest (Windows-safe filename)
+    generated/
+      <sha256-hex>.json          # 리소스 변경 없는 생성 결과의 Git 감사 기록
     fixtures/
       manifest.valid.json        # 스키마 및 소비자 테스트 fixture
     source/
@@ -381,7 +383,8 @@ concurrency:
 6. JSON Schema, generator test 및 Sharlayan contract test를 실행한다.
 7. production manifest와 비교하여 리소스 변경 여부를 판단한다.
 8. production이 아직 없으면 fixture와 동일해도 최초 candidate PR을 만든다.
-9. production이 있고 리소스가 바뀌지 않았으면 처리한 FCS SHA 상태만 갱신한다.
+9. production이 있고 리소스가 바뀌지 않았으면 생성 manifest를 `v2/generated/`에
+   감사 기록으로 보존하고 처리한 FCS SHA 상태를 갱신한다.
 10. 리소스가 바뀌면 candidate manifest와 diff를 포함한 PR을 만든다.
 11. 자동 생성 PR에는 R2 credential을 제공하지 않는다.
 

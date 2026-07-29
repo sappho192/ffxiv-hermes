@@ -2,6 +2,7 @@ namespace Hermes.V2.Generator.Tests;
 
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 using Xunit;
@@ -109,6 +110,29 @@ public sealed class GeneratorTests {
         string schema = Path.Combine(root, "schemas", "hermes-v2.schema.json");
 
         ManifestValidator.Validate(File.ReadAllBytes(manifest), schema);
+    }
+
+    [Fact]
+    public void RepositoryGeneratedAuditRecordsAreCanonicalAndNamedByRevision() {
+        string root = FindRepositoryRoot();
+        string directory = Path.Combine(root, "v2", "generated");
+        string schema = Path.Combine(root, "schemas", "hermes-v2.schema.json");
+        string[] manifests = Directory.GetFiles(directory, "*.json");
+
+        Assert.NotEmpty(manifests);
+        foreach (string path in manifests) {
+            byte[] bytes = File.ReadAllBytes(path);
+            ManifestValidator.Validate(bytes, schema);
+
+            HermesManifest manifest = JsonSerializer.Deserialize<HermesManifest>(
+                bytes,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+            Assert.Equal("generated", manifest.Validation.Status);
+            Assert.Equal(bytes, CanonicalJson.Serialize(manifest));
+            Assert.Equal(
+                Path.GetFileNameWithoutExtension(path),
+                CanonicalJson.Revision(bytes)["sha256:".Length..]);
+        }
     }
 
     [Fact]

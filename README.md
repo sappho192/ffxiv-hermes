@@ -13,7 +13,9 @@ FFXIVClientStructs-based manifests for CHATLOG and the last standard NPC Talk.
 - `fcs-v2-publish.yml` checks FCS `main` every six hours, runs deterministic
   generation and static validation, and publishes changed runtime resources with
   `validation.status=generated`. The external FCS build job has no production
-  credentials; a separate job revalidates its artifact before publication.
+  credentials; a separate job revalidates its artifact before publication. Generated
+  manifests with unchanged runtime resources are retained under `v2/generated/` as
+  repository-only audit records without changing production or R2.
 - `publish-v2.yml` rolls `v2/latest.json` back to the preceding or an explicitly
   selected immutable revision.
 

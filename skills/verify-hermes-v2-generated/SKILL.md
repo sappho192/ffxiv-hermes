@@ -48,7 +48,8 @@ Inspect `.github/workflows/fcs-v2-publish.yml` and require:
 9. Git records manifest, latest, and FCS head before R2 latest changes;
 10. reruns reconcile R2 latest to the Git-recorded target;
 11. public latest and immutable bytes are verified with transient-error retries;
-12. unchanged FCS resources only advance `v2/source/fcs-head.json`.
+12. unchanged FCS resources preserve the canonical generated manifest under `v2/generated/`,
+    advance `v2/source/fcs-head.json`, and leave production latest unchanged.
 
 Confirm the job uses the `main` environment for secret scope, not manual approval.
 

@@ -9,9 +9,11 @@ order, two-space indentation, LF newlines, no UTF-8 BOM, and exactly one trailin
 newline.
 
 `latest.json` is mutable and is published only after its immutable manifest has been
-uploaded and read back successfully. Generated evidence is retained as a workflow
-artifact. Historic candidate files are repository records and are never referenced
-by `latest.json`.
+uploaded and read back successfully. When generation finds no `{roots,resources}`
+change, the canonical result is retained under `generated/<sha256-hex>.json` as a
+repository-only audit record. The filename is its generated resource revision, while
+the exact FCS and generator commits remain in the manifest's `source` object. Historic
+candidate files are repository records and are never referenced by `latest.json`.
 
 The public R2 key retains the full revision (`v2/manifests/sha256:<hex>.json`). Git and
 local cache filenames use only `<hex>.json` because `:` is not a valid Windows filename
@@ -21,8 +23,8 @@ The public base URL is `https://hermes.sapphosound.com/v2/`. Relative to this ba
 the mutable pointer is `latest.json` and immutable objects are
 `manifests/sha256:<hex>.json`. The R2 object keys retain the leading `v2/` prefix.
 
-Repository-only fixtures and FCS processing state are stored under `fixtures/` and
-`source/`; they are not public R2 objects.
+Repository-only generated records, fixtures, and FCS processing state are stored
+under `generated/`, `fixtures/`, and `source/`; they are not public R2 objects.
 
 The scheduled workflow generates twice, compares canonical bytes, runs schema and
 semantic validation, and publishes only when `{roots,resources}` changes. A
