@@ -10,10 +10,11 @@ newline.
 
 `latest.json` is mutable and is published only after its immutable manifest has been
 uploaded and read back successfully. When generation finds no `{roots,resources}`
-change, the canonical result is retained under `generated/<sha256-hex>.json` as a
-repository-only audit record. The filename is its generated resource revision, while
-the exact FCS and generator commits remain in the manifest's `source` object. Historic
-candidate files are repository records and are never referenced by `latest.json`.
+change, the canonical result is retained under `v2/generated/<sha256-hex>.json` on the
+orphan `hermes-v2/audit` branch. The audit filename is its generated resource revision,
+while the exact FCS and generator commits remain in the manifest's `source` object.
+Historic candidate files on `main` are repository records and are never referenced by
+`latest.json`.
 
 The public R2 key retains the full revision (`v2/manifests/sha256:<hex>.json`). Git and
 local cache filenames use only `<hex>.json` because `:` is not a valid Windows filename
@@ -23,13 +24,15 @@ The public base URL is `https://hermes.sapphosound.com/v2/`. Relative to this ba
 the mutable pointer is `latest.json` and immutable objects are
 `manifests/sha256:<hex>.json`. The R2 object keys retain the leading `v2/` prefix.
 
-Repository-only generated records, fixtures, and FCS processing state are stored
-under `generated/`, `fixtures/`, and `source/`; they are not public R2 objects.
+Repository-only fixtures are stored under `fixtures/` on `main`. Generated audit
+records and FCS processing state exist only on `hermes-v2/audit`; they are not public
+R2 objects.
 
-The scheduled workflow generates twice, compares canonical bytes, runs schema and
-semantic validation, and publishes only when `{roots,resources}` changes. A
-`generated` manifest requires Sharlayan.Lite 9.2.1 or newer and contains no
-live-verification metadata.
+The scheduled workflow reads processed state from `hermes-v2/audit`, generates twice,
+compares canonical bytes, and runs schema and semantic validation. Unchanged results
+advance only the audit branch. Production jobs run only for a resource change or
+recovery of an incomplete publish. A `generated` manifest requires Sharlayan.Lite
+9.2.1 or newer and contains no live-verification metadata.
 
 The first production manifest requires three runtime resources:
 

@@ -25,8 +25,9 @@ Workflow success alone is not complete production proof.
 
 ## Verify Git, R2, and public state
 
-Fetch current `origin/main` and resolve `v2/latest.json`, its Git manifest, and
-`v2/source/fcs-head.json`. Fetch public latest and immutable objects with retries.
+Fetch current `origin/main` and `origin/hermes-v2/audit`. Resolve `v2/latest.json`, its Git
+manifest, and audit `v2/source/fcs-state.json`. Fetch public latest and immutable objects with
+retries.
 
 Require:
 
@@ -43,14 +44,16 @@ Require:
 
 Inspect separately:
 
-1. generated target and revision from workflow artifacts;
+1. generated target and revision from workflow artifacts or the audit branch;
 2. immutable R2 object and read-back bytes;
 3. Git latest and manifest;
 4. direct R2 latest;
 5. public CDN latest and immutable bytes.
 
-Never overwrite an immutable revision with different bytes. A rerun of the scheduled workflow
-reconciles R2 latest to the Git-recorded target. Do not assume a failed CDN check means upload failed.
+Never overwrite an immutable revision with different bytes. Audit state advances only after
+successful archival or publication. A rerun regenerates work that failed before the Git record or
+reconciles a Git-recorded target that failed afterward. Do not assume a failed CDN check means
+upload failed.
 
 ## Roll back
 
@@ -76,7 +79,7 @@ gh workflow run publish-v2.yml `
 ```
 
 Require the target manifest to exist in Git and R2 with identical bytes. Confirm the workflow
-records the rollback latest in Git before replacing R2 latest. `v2/source/fcs-head.json` intentionally
+records the rollback latest in Git before replacing R2 latest. Audit processed state intentionally
 remains unchanged so the next schedule does not immediately republish the rolled-back FCS.
 
 ## Optional application smoke

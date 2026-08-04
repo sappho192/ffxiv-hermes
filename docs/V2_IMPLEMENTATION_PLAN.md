@@ -104,12 +104,8 @@ ffxiv-hermes/
     latest.json                  # 현재 production manifest를 가리키는 포인터
     manifests/
       <sha256-hex>.json          # immutable 검증 완료 manifest (Windows-safe filename)
-    generated/
-      <sha256-hex>.json          # 리소스 변경 없는 생성 결과의 Git 감사 기록
     fixtures/
       manifest.valid.json        # 스키마 및 소비자 테스트 fixture
-    source/
-      fcs-head.json              # workflow가 마지막으로 처리한 FCS HEAD
   tools/
     Hermes.V2.Generator/
   schemas/
@@ -120,6 +116,9 @@ ffxiv-hermes/
       fcs-v2-candidate.yml       # FCS 확인 및 candidate 생성
       publish-v2.yml             # 승인된 v2 배포 및 rollback
 ```
+
+변화 없는 생성 결과와 마지막 처리 상태는 `main`이 아니라 orphan
+`hermes-v2/audit` 브랜치의 `v2/generated/` 및 `v2/source/fcs-state.json`에 저장한다.
 
 R2에는 다음 public object만 배포한다.
 
@@ -377,14 +376,14 @@ concurrency:
 
 1. `git ls-remote`로 FCS `refs/heads/main` SHA를 한 번만 확인한다.
 2. SHA 형식을 검증하고 해당 실행 전체에서 같은 SHA를 사용한다.
-3. `v2/source/fcs-head.json`과 같으면 종료한다.
+3. orphan `hermes-v2/audit` 브랜치의 `v2/source/fcs-state.json`과 같으면 `noop`으로 종료한다.
 4. FCS를 detached HEAD로 checkout한다.
 5. generator를 두 번 실행하고 byte-identical 결과를 확인한다.
 6. JSON Schema, generator test 및 Sharlayan contract test를 실행한다.
 7. production manifest와 비교하여 리소스 변경 여부를 판단한다.
 8. production이 아직 없으면 fixture와 동일해도 최초 candidate PR을 만든다.
-9. production이 있고 리소스가 바뀌지 않았으면 생성 manifest를 `v2/generated/`에
-   감사 기록으로 보존하고 처리한 FCS SHA 상태를 갱신한다.
+9. production이 있고 리소스가 바뀌지 않았으면 생성 manifest와 처리 상태를
+   `hermes-v2/audit`에만 기록하고 production job은 실행하지 않는다.
 10. 리소스가 바뀌면 candidate manifest와 diff를 포함한 PR을 만든다.
 11. 자동 생성 PR에는 R2 credential을 제공하지 않는다.
 

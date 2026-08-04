@@ -26,9 +26,9 @@ This file applies to the whole `ffxiv-hermes` repository.
 - `/latest/address.json` is a legacy endpoint with indefinite support. Do not remove or repurpose it.
 - Scheduled publication creates `validation.status=generated` manifests with no live-verification
   metadata. Historic `live-verified` manifests remain valid immutable revisions.
-- When generated `{roots,resources}` are unchanged, retain the canonical result under
-  `v2/generated/<sha256-hex>.json` as a repository-only audit record, advance
-  `v2/source/fcs-head.json`, and leave production latest unchanged.
+- Generated audit records and processed-FCS state live only on the orphan
+  `hermes-v2/audit` branch. When `{roots,resources}` are unchanged, advance that branch and leave
+  `main`, the production environment, R2, and public verification untouched.
 - External FCS build and generation must run in a job without production environments or secrets.
   A separate publication job revalidates the artifact before receiving R2 credentials.
 - Upload and read back the immutable manifest before replacing `v2/latest.json`.
@@ -93,9 +93,10 @@ gh api repos/sappho192/ffxiv-hermes/environments/main/deployment-branch-policies
   origin TTL.
 - Public endpoint checks must tolerate transient CDN errors. Do not remove the retry behavior added
   after the first production request returned a transient 403.
-- On a failed publish job, inspect R2 read-back, public latest, immutable object, and Git production
-  state separately before retrying. The scheduled workflow reconciles R2 latest to the Git-recorded
-  target on rerun; a failed final verification does not prove the upload failed.
+- On a failed publish job, inspect R2 read-back, public latest, immutable object, Git production
+  state, and the audit branch separately before retrying. Audit state advances only after success;
+  the next schedule regenerates or reconciles the Git-recorded target as appropriate. A failed
+  final verification does not prove the upload failed.
 
 ## Current production baseline
 

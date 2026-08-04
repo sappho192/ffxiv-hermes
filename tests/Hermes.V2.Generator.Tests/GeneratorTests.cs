@@ -2,7 +2,6 @@ namespace Hermes.V2.Generator.Tests;
 
 using System.Reflection;
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 
 using Xunit;
@@ -112,27 +111,72 @@ public sealed class GeneratorTests {
         ManifestValidator.Validate(File.ReadAllBytes(manifest), schema);
     }
 
+    [Theory]
+    [InlineData(false, true, false, "noop")]
+    [InlineData(false, false, true, "reconcile")]
+    [InlineData(false, false, false, "generate")]
+    [InlineData(true, true, false, "generate")]
+    public void PlansPublicationBeforeGeneration(
+        bool forceRegenerate,
+        bool auditMatches,
+        bool latestMatches,
+        string expected) {
+        string requested = new('a', 40);
+        string audit = auditMatches ? requested : new('b', 40);
+        string latest = latestMatches ? requested : new('c', 40);
+
+        PublicationAction action = PublicationPlanner.BeforeGeneration(
+            requested,
+            audit,
+            latest,
+            forceRegenerate);
+        Assert.Equal(expected, PublicationPlanner.WorkflowValue(action));
+    }
+
     [Fact]
-    public void RepositoryGeneratedAuditRecordsAreCanonicalAndNamedByRevision() {
-        string root = FindRepositoryRoot();
-        string directory = Path.Combine(root, "v2", "generated");
-        string schema = Path.Combine(root, "schemas", "hermes-v2.schema.json");
-        string[] manifests = Directory.GetFiles(directory, "*.json");
+    public void SelectsRecordOnlyWhenRuntimeResourcesAreUnchanged() {
+        HermesManifest current = CreateManifest();
+        HermesManifest generated = current with {
+            Compatibility = new Compatibility("9.2.1", 1),
+            Source = current.Source with {
+                FcsCommit = new string('c', 40),
+                GeneratorCommit = new string('d', 40),
+            },
+            Validation = new Validation("generated"),
+        };
 
-        Assert.NotEmpty(manifests);
-        foreach (string path in manifests) {
-            byte[] bytes = File.ReadAllBytes(path);
-            ManifestValidator.Validate(bytes, schema);
+        Assert.Equal(
+            PublicationAction.RecordOnly,
+            PublicationPlanner.AfterGeneration(
+                CanonicalJson.Serialize(current),
+                CanonicalJson.Serialize(generated)));
+    }
 
-            HermesManifest manifest = JsonSerializer.Deserialize<HermesManifest>(
-                bytes,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
-            Assert.Equal("generated", manifest.Validation.Status);
-            Assert.Equal(bytes, CanonicalJson.Serialize(manifest));
-            Assert.Equal(
-                Path.GetFileNameWithoutExtension(path),
-                CanonicalJson.Revision(bytes)["sha256:".Length..]);
-        }
+    [Fact]
+    public void SelectsPublishWhenRuntimeResourcesChange() {
+        HermesManifest current = CreateManifest();
+        HermesManifest generated = current with {
+            Resources = current.Resources with {
+                ChatLog = current.Resources.ChatLog with { IndexVectorOffset = 0x50 },
+            },
+        };
+
+        Assert.Equal(
+            PublicationAction.Publish,
+            PublicationPlanner.AfterGeneration(
+                CanonicalJson.Serialize(current),
+                CanonicalJson.Serialize(generated)));
+    }
+
+    [Fact]
+    public void ImmutableAuditRecordAcceptsOnlyIdenticalBytes() {
+        byte[] existing = Encoding.UTF8.GetBytes("same\n");
+
+        PublicationPlanner.RequireIdenticalImmutableBytes(existing, [.. existing]);
+        Assert.Throws<InvalidOperationException>(
+            () => PublicationPlanner.RequireIdenticalImmutableBytes(
+                existing,
+                Encoding.UTF8.GetBytes("different\n")));
     }
 
     [Fact]

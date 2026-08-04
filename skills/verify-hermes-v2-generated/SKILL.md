@@ -45,11 +45,13 @@ Inspect `.github/workflows/fcs-v2-publish.yml` and require:
 6. a separate credentialed job revalidates revision, provenance, status, and resource diff;
 7. only `{roots,resources}` changes create a new revision;
 8. immutable R2 bytes are uploaded or accepted only when read-back is identical;
-9. Git records manifest, latest, and FCS head before R2 latest changes;
-10. reruns reconcile R2 latest to the Git-recorded target;
+9. Git records the production manifest and latest before R2 latest changes;
+10. audit state advances only after record-only archival or successful publication, so reruns
+    regenerate or reconcile incomplete work;
 11. public latest and immutable bytes are verified with transient-error retries;
-12. unchanged FCS resources preserve the canonical generated manifest under `v2/generated/`,
-    advance `v2/source/fcs-head.json`, and leave production latest unchanged.
+12. unchanged FCS resources preserve the canonical generated manifest and state only on
+    `hermes-v2/audit`, while skipping `main`, the production environment, R2, and public checks;
+13. `noop` skips FCS build, artifacts, Git writes, and all production jobs.
 
 Confirm the job uses the `main` environment for secret scope, not manual approval.
 

@@ -10,12 +10,16 @@ internal static partial class Program {
     private static int Main(string[] args) {
         try {
             if (args.Length == 0) {
-                throw new ArgumentException("Expected command: generate, probe-layout, validate, or revision.");
+                throw new ArgumentException(
+                    "Expected command: generate, plan-publication, select-publication, verify-immutable, probe-layout, validate, or revision.");
             }
 
             Dictionary<string, string> options = ParseOptions(args.Skip(1));
             return args[0] switch {
                 "generate" => Generate(options),
+                "plan-publication" => PlanPublication(options),
+                "select-publication" => SelectPublication(options),
+                "verify-immutable" => VerifyImmutable(options),
                 "probe-layout" => ProbeLayout(options),
                 "validate" => Validate(options),
                 "revision" => Revision(options),
@@ -26,6 +30,39 @@ internal static partial class Program {
             Console.Error.WriteLine($"error: {exception.Message}");
             return 1;
         }
+    }
+
+    private static int PlanPublication(IReadOnlyDictionary<string, string> options) {
+        string fcsCommit = RequiredSha(options, "fcs-commit");
+        string auditFcsCommit = RequiredSha(options, "audit-fcs-commit");
+        string latestFcsCommit = RequiredSha(options, "latest-fcs-commit");
+        string forceValue = Required(options, "force-regenerate");
+        if (!bool.TryParse(forceValue, out bool forceRegenerate)) {
+            throw new ArgumentException("--force-regenerate must be true or false.");
+        }
+
+        PublicationAction action = PublicationPlanner.BeforeGeneration(
+            fcsCommit,
+            auditFcsCommit,
+            latestFcsCommit,
+            forceRegenerate);
+        Console.WriteLine(PublicationPlanner.WorkflowValue(action));
+        return 0;
+    }
+
+    private static int SelectPublication(IReadOnlyDictionary<string, string> options) {
+        byte[] current = File.ReadAllBytes(FullPath(Required(options, "current-manifest")));
+        byte[] generated = File.ReadAllBytes(FullPath(Required(options, "generated-manifest")));
+        PublicationAction action = PublicationPlanner.AfterGeneration(current, generated);
+        Console.WriteLine(PublicationPlanner.WorkflowValue(action));
+        return 0;
+    }
+
+    private static int VerifyImmutable(IReadOnlyDictionary<string, string> options) {
+        byte[] existing = File.ReadAllBytes(FullPath(Required(options, "existing")));
+        byte[] candidate = File.ReadAllBytes(FullPath(Required(options, "candidate")));
+        PublicationPlanner.RequireIdenticalImmutableBytes(existing, candidate);
+        return 0;
     }
 
     private static int ProbeLayout(IReadOnlyDictionary<string, string> options) {
