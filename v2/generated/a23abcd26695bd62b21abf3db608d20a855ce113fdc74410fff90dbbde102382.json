@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 2,
+  "compatibility": {
+    "minimumSharlayanVersion": "9.2.1",
+    "pointerResolverVersion": 1
+  },
+  "source": {
+    "fcsRepository": "https://github.com/aers/FFXIVClientStructs.git",
+    "fcsCommit": "8c9ef2876f2d50190bba094b875add984ea88f55",
+    "generatorRepository": "https://github.com/sappho192/ffxiv-hermes.git",
+    "generatorCommit": "faea86580bccf520ef61cab532da3e20859ec8a7"
+  },
+  "platform": {
+    "process": "ffxiv_dx11.exe",
+    "architecture": "x64"
+  },
+  "roots": {
+    "framework": {
+      "pattern": "488B1D????????8B7C24",
+      "relativeFollowOffset": 3,
+      "isPointer": true
+    }
+  },
+  "resources": {
+    "chatLog": {
+      "root": "framework",
+      "uiModuleOffset": 11112,
+      "raptureLogModuleOffset": 6848,
+      "indexVectorOffset": 72,
+      "dataVectorOffset": 96
+    },
+    "talk": {
+      "root": "framework",
+      "semantics": "lastStandardTalk",
+      "uiModuleOffset": 11112,
+      "nameOffset": 1044240,
+      "textOffset": 1044344,
+      "utf8String": {
+        "stringPointerOffset": 0,
+        "bufferUsedOffset": 16,
+        "lengthSource": "bufferUsedMinusNull"
+      }
+    },
+    "currentTalk": {
+      "root": "framework",
+      "semantics": "currentStandardTalk",
+      "uiModuleOffset": 11112,
+      "raptureAtkModuleOffset": 861808,
+      "raptureAtkUnitManagerOffset": 78896,
+      "allLoadedUnitsListOffset": 26880,
+      "atkUnitList": {
+        "entriesOffset": 8,
+        "countOffset": 2056,
+        "capacity": 256,
+        "entrySize": 8
+      },
+      "atkUnitBase": {
+        "nameOffset": 8,
+        "nameCapacity": 32,
+        "visibilityStateOffset": 408,
+        "visibilityMask": 2097152,
+        "readinessOffset": 417,
+        "readinessMask": 1,
+        "atkValuesPointerOffset": 376,
+        "atkValuesCountOffset": 482
+      },
+      "atkValue": {
+        "size": 16,
+        "typeOffset": 0,
+        "valueOffset": 8,
+        "allowedStringTypes": [
+          40
+        ]
+      },
+      "addonName": "Talk",
+      "textValueIndex": 0,
+      "nameValueIndex": 1
+    },
+    "battleTalk": {
+      "root": "framework",
+      "semantics": "currentBattleTalk",
+      "uiModuleOffset": 11112,
+      "raptureAtkModuleOffset": 861808,
+      "raptureAtkUnitManagerOffset": 78896,
+      "allLoadedUnitsListOffset": 26880,
+      "atkUnitList": {
+        "entriesOffset": 8,
+        "countOffset": 2056,
+        "capacity": 256,
+        "entrySize": 8
+      },
+      "addon": {
+        "nameOffset": 8,
+        "nameCapacity": 32,
+        "visibilityStateOffset": 408,
+        "visibilityMask": 2097152,
+        "readinessOffset": 417,
+        "readinessMask": 1
+      },
+      "addonName": "_BattleTalk",
+      "atkArrayDataHolderOffset": 7080,
+      "arrayDataHolder": {
+        "numberArrayCountOffset": 0,
+        "numberArraysOffset": 24,
+        "stringArrayCountOffset": 2,
+        "stringArraysOffset": 48
+      },
+      "arrayData": {
+        "sizeOffset": 8,
+        "updateStateOffset": 31
+      },
+      "numberValuesOffset": 40,
+      "stringValuesOffset": 40,
+      "numberArrayId": 38,
+      "stringArrayId": 35,
+      "visibleIndex": 0,
+      "nameIndex": 0,
+      "textIndex": 1,
+      "sequenceSemantics": "visibilityOrContentGeneration"
+    }
+  },
+  "validation": {
+    "status": "generated"
+  }
+}
