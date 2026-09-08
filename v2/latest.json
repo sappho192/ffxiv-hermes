@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "resourceRevision": "sha256:3867f77f8deefb72998c1eb1ba03459df67817bc9f65d1370f90235787cb18b5",
-  "manifest": "manifests/sha256:3867f77f8deefb72998c1eb1ba03459df67817bc9f65d1370f90235787cb18b5.json",
-  "fcsCommit": "81b94d8729306e5e43635811d42bac18f58993bb",
-  "publishedAt": "2026-07-28T14:10:46Z"
+  "resourceRevision": "sha256:753ed1933c88b05f85c7365c4ce6791095b31ca84c7a256611e60d8b3cf9d7a3",
+  "manifest": "manifests/sha256:753ed1933c88b05f85c7365c4ce6791095b31ca84c7a256611e60d8b3cf9d7a3.json",
+  "fcsCommit": "1f10edb6290395b4fd33f1a56844382ac6497530",
+  "publishedAt": "2026-09-08T11:02:04Z"
 }
